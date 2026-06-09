@@ -44,7 +44,7 @@ const LoadingScreen = () => {
         textAlign: 'center',
       }}>
         <img 
-          src="/icon.png" 
+          src="/ICON.png" 
           alt="Wardrobe" 
           style={{ 
             width: 80, 
