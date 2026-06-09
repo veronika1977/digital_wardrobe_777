@@ -32,7 +32,6 @@ export const SubscriptionModal = ({ isOpen, onClose, onUpgrade, theme, freeLimit
         maxWidth: 380,
         textAlign: 'center',
       }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>💎</div>
         <h2 style={{ margin: 0, color: theme.text }}>Premium доступ</h2>
         <p style={{ color: theme.textSecondary, marginTop: 8 }}>
           Вы добавили {currentItemsCount} из {freeLimit} бесплатных вещей
@@ -50,13 +49,13 @@ export const SubscriptionModal = ({ isOpen, onClose, onUpgrade, theme, freeLimit
 
         <div style={{ marginBottom: 20, textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span>✅</span> <span style={{ color: theme.text }}>Безлимит вещей</span>
+            <span style={{ color: theme.text }}>Безлимит вещей</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span>✅</span> <span style={{ color: theme.text }}>Все капсулы (8-3 и 10-5)</span>
+             <span style={{ color: theme.text }}>Все капсулы (8-3 и 10-5)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span>✅</span> <span style={{ color: theme.text }}>AI обработка фото</span>
+             <span style={{ color: theme.text }}>AI обработка фото</span>
           </div>
         </div>
 
@@ -75,7 +74,7 @@ export const SubscriptionModal = ({ isOpen, onClose, onUpgrade, theme, freeLimit
             marginBottom: 12,
           }}
         >
-          🔓 Получить Premium
+          Получить Premium
         </button>
 
         <button
