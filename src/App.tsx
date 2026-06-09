@@ -745,8 +745,8 @@ const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
 
   return (
     <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ background: theme.primary, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
-        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.primaryText }}>МОИ КАПСУЛЫ</h1>
+      <div style={{ background: 'transparent', borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
+        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>МОИ КАПСУЛЫ</h1>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 16, marginBottom: 32 }}>
@@ -952,7 +952,7 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
     <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1400 : '100%', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: isDesktop ? 40 : 32, fontWeight: 700, color: theme.primary, margin: 0 }}>Мой гардероб</h1>
+          <h1 style={{ fontSize: isDesktop ? 40 : 32, fontWeight: 700, color: theme.primary, margin: 0, fontFamily: "Playfair Display, serif", letterSpacing: "-0.02em" }}>Мой гардероб</h1>
           <p style={{ color: theme.textSecondary, marginTop: 4, fontSize: 14 }}>{visibleClothes.length} вещей</p>
         </div>
         <button 
@@ -1223,8 +1223,8 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 
   return (
     <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ background: theme.primary, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
-        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.primaryText }}>Календарь носки</h1>
+      <div style={{ background: "transparent", borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
+        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Календарь носки</h1>
         <p style={{ color: theme.primaryText, opacity: 0.8, marginTop: 8 }}>Отслеживайте как часто носите вещи</p>
       </div>
 
@@ -1245,7 +1245,7 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 
       {topItems.length > 0 && (
         <div style={{ background: "transparent", borderRadius: 16, padding: 20, marginBottom: 24, border: `1px solid ${theme.secondary}` }}>
-          <h3 style={{ marginBottom: 16, color: theme.text }}>🏆 Чаще всего носите</h3>
+          <h3 style={{ marginBottom: 16, color: theme.text }}>Чаще всего носите</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {topItems.map((item, index) => {
               const foundItem = clothes.find((c: any) => c.id === item.id);
@@ -1376,7 +1376,7 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
                     <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>
                       {itemStats[item.id] || 0} раз всего
                     </div>
-                    {isWorn && <div style={{ marginTop: 4, fontSize: 11, color: theme.primary, fontWeight: 600 }}>✅ Отмечено</div>}
+                    {isWorn && <div style={{ marginTop: 4, fontSize: 11, color: theme.primary, fontWeight: 600 }}>Отмечено</div>}
                   </div>
                 );
               })}
