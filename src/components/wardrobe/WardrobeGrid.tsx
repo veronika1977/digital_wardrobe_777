@@ -128,7 +128,6 @@ export const WardrobeGrid = ({ clothes, setClothes, history }: Props) => {
 
       {visibleClothes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, background: theme.card, borderRadius: 24 }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>👗</div>
           <p style={{ color: theme.textSecondary }}>Добавьте первую вещь</p>
           <button onClick={() => setShowAdd(true)} style={{ marginTop: 16, padding: '12px 24px', background: theme.gradient, border: 'none', borderRadius: 30, cursor: 'pointer' }}>+ Добавить</button>
         </div>
@@ -138,7 +137,7 @@ export const WardrobeGrid = ({ clothes, setClothes, history }: Props) => {
             <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 12, position: 'relative' }}>
               <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, marginBottom: 8 }} alt="" />
               <div style={{ fontWeight: 500 }}>{item.name}</div>
-              <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>👕 {getWornCount(item.id)} раз</div>
+              <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>{getWornCount(item.id)} раз</div>
               <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer' }}>🗑️</button>
             </div>
           ))}

@@ -4,21 +4,20 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 // Colors
 const getTheme = () => {
   return {
-    bg: '#FFFFF0',
+    bg: '#E6E5E3',
     card: '#FFFFFF',
-    primary: '#442F29',
+    primary: '#373635',
     primaryText: '#FFFFFF',
-    secondary: '#E8E0D5',
-    text: '#442F29',
-    textSecondary: '#8B7355',
-    accent: '#C4A47A',
+    secondary: '#D4D3D1',
+    text: '#373635',
+    textSecondary: '#6B6A69',
+    accent: '#8B8A89',
     destructive: '#E57373',
     success: '#4CAF50',
-    gradient: 'linear-gradient(135deg, #442F29 0%, #6B4423 100%)',
+    gradient: 'linear-gradient(135deg, #373635 0%, #5A5958 100%)',
   };
 };
 
-// filters
 const СЕЗОНЫ = [
   { id: 'winter', name: 'Зима', color: '#6BB5E0' },
   { id: 'spring', name: 'Весна', color: '#E8A87C' },
@@ -100,17 +99,15 @@ const useTelegram = () => {
   return { haptic, showAlert, isReady: !!tg };
 };
 
-
-
 const SmallSearchIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="9" r="6" stroke="#442F29" strokeWidth="1.5" fill="none"/>
-    <path d="M13 13L17 17" stroke="#442F29" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="9" cy="9" r="6" stroke="#373635" strokeWidth="1.5" fill="none"/>
+    <path d="M13 13L17 17" stroke="#373635" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const ChevronDownIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#442F29" strokeWidth="2">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#373635" strokeWidth="2">
     <path d="m6 9 6 6 6-6"/>
   </svg>
 );
@@ -126,6 +123,27 @@ const CloseIcon = () => (
     <path d="M18 6L6 18M6 6l12 12"/>
   </svg>
 );
+const useAutoCleanup = (clothes: any[], setClothes: (items: any[]) => void) => {
+  useEffect(() => {
+    const cleanup = () => {
+      const now = Date.now();
+      const twoWeeks = 14 * 24 * 60 * 60 * 1000;
+      const cleaned = clothes.filter((item: any) => {
+        if (item.deletedAt) {
+          const deletedTime = new Date(item.deletedAt).getTime();
+          return (now - deletedTime) < twoWeeks;
+        }
+        return true;
+      });
+      if (cleaned.length !== clothes.length) {
+        setClothes(cleaned);
+      }
+    };
+    cleanup();
+    const interval = setInterval(cleanup, 60 * 60 * 1000); // каждый час
+    return () => clearInterval(interval);
+  }, [clothes, setClothes]);
+};
 
 const OnboardingSlider = ({ onComplete }: { onComplete: () => void }) => {
   const [slide, setSlide] = useState(0);
@@ -133,7 +151,7 @@ const OnboardingSlider = ({ onComplete }: { onComplete: () => void }) => {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   
   const slides = [
-    { title: 'CLOSET FLOW', description: 'Управляй гардеробом со стилем', icon: '👗' },
+    { title: 'CLOSET FLOW', description: 'Управляй гардеробом со стилем', icon: '' },
     { title: 'КАПСУЛЫ 8-3', description: '8 вещей = 3 образа' },
     { title: 'КАПСУЛЫ 10-5', description: '10 вещей = 5 образов' },
   ];
@@ -155,8 +173,7 @@ const OnboardingSlider = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-// Bottom tab
-const BottomNavBar = ({ currentScreen, onScreenChange }: any) => {
+const BottomNavBar = ({ currentScreen, onScreenChange, basketCount }: any) => {
   const theme = getTheme();
   const isDesktop = useMediaQuery('(min-width: 768px)');
   
@@ -180,8 +197,10 @@ const BottomNavBar = ({ currentScreen, onScreenChange }: any) => {
   }
 
   const tabs = [
+    { id: 'outfits', label: 'Аутфиты', icon: '👔' },
     { id: 'capsules', label: 'Капсулы', icon: '✨' },
     { id: 'wardrobe', label: 'Гардероб', icon: '👕' },
+    { id: 'basket', label: 'Корзина', icon: '🗑️', badge: basketCount },
     { id: 'calendar', label: 'Календарь', icon: '📅' },
   ];
 
@@ -204,10 +223,33 @@ const BottomNavBar = ({ currentScreen, onScreenChange }: any) => {
               gap: 4,
               opacity: isActive ? 1 : 0.5,
               color: theme.primaryText,
+              position: 'relative',
             }}
           >
-            <span style={{ fontSize: 24 }}>{tab.icon}</span>
-            <span style={{ fontSize: isDesktop ? 13 : 11, fontWeight: 500 }}>{tab.label}</span>
+            <span style={{ fontSize: 24, position: 'relative' }}>
+              {tab.icon}
+              {tab.badge > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -8,
+                  background: theme.destructive,
+                  color: 'white',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                }}>
+                  {tab.badge}
+                </span>
+              )}
+            </span>
+            <span style={{ fontSize: isDesktop ? 11 : 10, fontWeight: 500 }}>{tab.label}</span>
           </button>
         );
       })}
@@ -233,7 +275,7 @@ const ItemCard = ({ item, onSelect, isSelected, theme, isDesktop }: any) => {
 
   return (
     <div onClick={() => onSelect?.(item)} style={{ 
-      background: "transparent", 
+      background: theme.card, 
       borderRadius: isDesktop ? 20 : 16, 
       padding: isDesktop ? 16 : 12, 
       cursor: onSelect ? 'pointer' : 'default', 
@@ -273,16 +315,9 @@ const FilterPills = ({
 }: any) => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
-  const closeAllDropdowns = () => {
-    setOpenDropdown(null);
-  };
-
+  const closeAllDropdowns = () => setOpenDropdown(null);
   const toggleDropdown = (dropdownName: string) => {
-    if (openDropdown === dropdownName) {
-      setOpenDropdown(null);
-    } else {
-      setOpenDropdown(dropdownName);
-    }
+    setOpenDropdown(openDropdown === dropdownName ? null : dropdownName);
   };
 
   const getCategoryName = (id: string) => {
@@ -292,60 +327,14 @@ const FilterPills = ({
 
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-      
-      {/* list of categories*/}
       <div style={{ position: 'relative' }}>
-        <button 
-          onClick={() => toggleDropdown('category')}
-          style={{ 
-            padding: '8px 16px', 
-            borderRadius: 25, 
-            background: filterCategory !== 'all' ? theme.primary : theme.card, 
-            border: `1px solid ${theme.primary}`,
-            color: filterCategory !== 'all' ? theme.primaryText : theme.text, 
-            fontSize: isDesktop ? 14 : 13, 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 8,
-          }}
-        >
-          {getCategoryName(filterCategory)} 
-          <ChevronDownIcon />
+        <button onClick={() => toggleDropdown('category')} style={{ padding: '8px 16px', borderRadius: 25, background: filterCategory !== 'all' ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterCategory !== 'all' ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {getCategoryName(filterCategory)} <ChevronDownIcon />
         </button>
         {openDropdown === 'category' && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 8,
-            background: theme.card,
-            border: `1px solid ${theme.secondary}`,
-            borderRadius: 12,
-            padding: 8,
-            zIndex: 1000,
-            minWidth: 160,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}>
+          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
             {КАТЕГОРИИ.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => { 
-                  setFilterCategory(cat.id); 
-                  closeAllDropdowns();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: filterCategory === cat.id ? theme.secondary : 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: theme.text,
-                  borderRadius: 8,
-                  fontSize: 13,
-                }}
-              >
+              <button key={cat.id} onClick={() => { setFilterCategory(cat.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterCategory === cat.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>
                 {cat.name}
               </button>
             ))}
@@ -353,80 +342,15 @@ const FilterPills = ({
         )}
       </div>
 
-      {/* list of materials */}
       <div style={{ position: 'relative' }}>
-        <button 
-          onClick={() => toggleDropdown('material')}
-          style={{ 
-            padding: '8px 16px', 
-            borderRadius: 25, 
-            background: filterMaterial !== 'all' ? theme.primary : theme.card, 
-            border: `1px solid ${theme.primary}`,
-            color: filterMaterial !== 'all' ? theme.primaryText : theme.text, 
-            fontSize: isDesktop ? 14 : 13, 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 8,
-          }}
-        >
-          Материал {filterMaterial !== 'all' && `• ${МАТЕРИАЛЫ.find(m => m.id === filterMaterial)?.name}`}
-          <ChevronDownIcon />
+        <button onClick={() => toggleDropdown('material')} style={{ padding: '8px 16px', borderRadius: 25, background: filterMaterial !== 'all' ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterMaterial !== 'all' ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          Материал {filterMaterial !== 'all' && `• ${МАТЕРИАЛЫ.find(m => m.id === filterMaterial)?.name}`} <ChevronDownIcon />
         </button>
         {openDropdown === 'material' && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 8,
-            background: theme.card,
-            border: `1px solid ${theme.secondary}`,
-            borderRadius: 12,
-            padding: 8,
-            zIndex: 1000,
-            minWidth: 160,
-            maxHeight: 300,
-            overflowY: 'auto',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}>
-            <button
-              onClick={() => { 
-                setFilterMaterial('all'); 
-                closeAllDropdowns();
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: filterMaterial === 'all' ? theme.secondary : 'none',
-                border: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: theme.text,
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              Все материалы
-            </button>
+          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, maxHeight: 300, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <button onClick={() => { setFilterMaterial('all'); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterMaterial === 'all' ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все материалы</button>
             {МАТЕРИАЛЫ.map(material => (
-              <button
-                key={material.id}
-                onClick={() => { 
-                  setFilterMaterial(material.id); 
-                  closeAllDropdowns();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: filterMaterial === material.id ? theme.secondary : 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: theme.text,
-                  borderRadius: 8,
-                  fontSize: 13,
-                }}
-              >
+              <button key={material.id} onClick={() => { setFilterMaterial(material.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterMaterial === material.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>
                 {material.name}
               </button>
             ))}
@@ -434,83 +358,15 @@ const FilterPills = ({
         )}
       </div>
 
-      {/* list of colors */}
       <div style={{ position: 'relative' }}>
-        <button 
-          onClick={() => toggleDropdown('color')}
-          style={{ 
-            padding: '8px 16px', 
-            borderRadius: 25, 
-            background: filterColor ? theme.primary : theme.card, 
-            border: `1px solid ${theme.primary}`,
-            color: filterColor ? theme.primaryText : theme.text, 
-            fontSize: isDesktop ? 14 : 13, 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 8,
-          }}
-        >
-          Цвет {filterColor && `• ${ЦВЕТА.find(c => c.id === filterColor)?.name}`}
-          <ChevronDownIcon />
+        <button onClick={() => toggleDropdown('color')} style={{ padding: '8px 16px', borderRadius: 25, background: filterColor ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterColor ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          Цвет {filterColor && `• ${ЦВЕТА.find(c => c.id === filterColor)?.name}`} <ChevronDownIcon />
         </button>
         {openDropdown === 'color' && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 8,
-            background: theme.card,
-            border: `1px solid ${theme.secondary}`,
-            borderRadius: 12,
-            padding: 8,
-            zIndex: 1000,
-            minWidth: 180,
-            maxHeight: 300,
-            overflowY: 'auto',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}>
-            <button
-              onClick={() => { 
-                setFilterColor(null); 
-                closeAllDropdowns();
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'none',
-                border: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: theme.text,
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              Все цвета
-            </button>
+          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 180, maxHeight: 300, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <button onClick={() => { setFilterColor(null); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все цвета</button>
             {ЦВЕТА.map(color => (
-              <button
-                key={color.id}
-                onClick={() => { 
-                  setFilterColor(color.id); 
-                  closeAllDropdowns();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: filterColor === color.id ? theme.secondary : 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: theme.text,
-                  borderRadius: 8,
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
+              <button key={color.id} onClick={() => { setFilterColor(color.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterColor === color.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 16, height: 16, borderRadius: 4, background: color.hex, border: '1px solid #ddd' }} />
                 {color.name}
               </button>
@@ -520,79 +376,14 @@ const FilterPills = ({
       </div>
 
       <div style={{ position: 'relative' }}>
-        <button 
-          onClick={() => toggleDropdown('season')}
-          style={{ 
-            padding: '8px 16px', 
-            borderRadius: 25, 
-            background: filterSeason ? theme.primary : theme.card, 
-            border: `1px solid ${theme.primary}`,
-            color: filterSeason ? theme.primaryText : theme.text, 
-            fontSize: isDesktop ? 14 : 13, 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 8,
-          }}
-        >
-          Сезон {filterSeason && `• ${СЕЗОНЫ.find(s => s.id === filterSeason)?.name}`}
-          <ChevronDownIcon />
+        <button onClick={() => toggleDropdown('season')} style={{ padding: '8px 16px', borderRadius: 25, background: filterSeason ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterSeason ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          Сезон {filterSeason && `• ${СЕЗОНЫ.find(s => s.id === filterSeason)?.name}`} <ChevronDownIcon />
         </button>
         {openDropdown === 'season' && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 8,
-            background: theme.card,
-            border: `1px solid ${theme.secondary}`,
-            borderRadius: 12,
-            padding: 8,
-            zIndex: 1000,
-            minWidth: 160,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}>
-            <button
-              onClick={() => { 
-                setFilterSeason(null); 
-                closeAllDropdowns();
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'none',
-                border: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: theme.text,
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              Все сезоны
-            </button>
+          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <button onClick={() => { setFilterSeason(null); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все сезоны</button>
             {СЕЗОНЫ.map(season => (
-              <button
-                key={season.id}
-                onClick={() => { 
-                  setFilterSeason(season.id); 
-                  closeAllDropdowns();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: filterSeason === season.id ? theme.secondary : 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: theme.text,
-                  borderRadius: 8,
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
+              <button key={season.id} onClick={() => { setFilterSeason(season.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterSeason === season.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 12, height: 12, borderRadius: 6, background: season.color }} />
                 {season.name}
               </button>
@@ -641,7 +432,7 @@ const CapsuleBuilder = ({ clothes, capsules, setCapsules, onBack, maxItems, type
       };
       setCapsules([...capsules, newCapsule]);
       setSelectedItems([]);
-      showAlert(`${title} сохранена! 🎉`);
+      showAlert(`${title} сохранена!`);
       haptic('medium');
       onBack();
     }
@@ -719,14 +510,13 @@ const CapsuleBuilder = ({ clothes, capsules, setCapsules, onBack, maxItems, type
 
       {selectedItems.length === maxItems && (
         <button onClick={saveCapsule} style={{ width: '100%', padding: isDesktop ? 18 : 16, background: theme.primary, border: 'none', borderRadius: 14, fontSize: isDesktop ? 18 : 16, fontWeight: 600, cursor: 'pointer', marginTop: 20, color: theme.primaryText }}>
-          💾 СОХРАНИТЬ
+          СОХРАНИТЬ
         </button>
       )}
     </div>
   );
 };
 
-// page with capsules
 const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
   const [activeCapsule, setActiveCapsule] = useState<string | null>(null);
   const theme = getTheme();
@@ -750,11 +540,11 @@ const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 16, marginBottom: 32 }}>
-        <div onClick={() => setActiveCapsule('8-3')} style={{ background: "transparent", borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
+        <div onClick={() => setActiveCapsule('8-3')} style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
           <h3 style={{ color: theme.text, marginBottom: 4 }}>8-3 Капсула</h3>
           <p style={{ color: theme.textSecondary }}>8 вещей = 3 образа</p>
         </div>
-        <div onClick={() => setActiveCapsule('10-5')} style={{ background: "transparent", borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
+        <div onClick={() => setActiveCapsule('10-5')} style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
           <h3 style={{ color: theme.text, marginBottom: 4 }}>10-5 Капсула</h3>
           <p style={{ color: theme.textSecondary }}>10 вещей = 5 образов</p>
         </div>
@@ -764,7 +554,7 @@ const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
         <div>
           <h3 style={{ color: theme.text, marginBottom: 16 }}>📦 Сохранённые капсулы</h3>
           {[...savedCapsules8, ...savedCapsules10].map((capsule: any) => (
-            <div key={capsule.id} style={{ background: "transparent", borderRadius: 16, padding: 16, marginBottom: 12, border: `1px solid ${theme.secondary}` }}>
+            <div key={capsule.id} style={{ background: theme.card, borderRadius: 16, padding: 16, marginBottom: 12, border: `1px solid ${theme.secondary}` }}>
               <div style={{ fontWeight: 600, marginBottom: 12, color: theme.text }}>{capsule.name}</div>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
                 {capsule.items.map((item: any) => (
@@ -779,7 +569,316 @@ const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
   );
 };
 
-// choosing photo
+// Page with outfits
+const OutfitsPage = ({ clothes, outfits, setOutfits }: any) => {
+  const [activeView, setActiveView] = useState<'list' | 'builder'>('list');
+  const [selectedOutfit, setSelectedOutfit] = useState<any>(null);
+  const theme = getTheme();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+
+  if (activeView === 'builder') {
+    return <OutfitBuilder clothes={clothes} outfits={outfits} setOutfits={setOutfits} onBack={() => setActiveView('list')} />;
+  }
+
+  return (
+    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Мои аутфиты</h1>
+        <button onClick={() => setActiveView('builder')} style={{ padding: '12px 24px', background: theme.primary, border: 'none', borderRadius: 25, color: theme.primaryText, cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>+</span> Создать
+        </button>
+      </div>
+
+      {outfits.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}></div>
+          <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>У вас пока нет сохранённых аутфитов</p>
+          <button onClick={() => setActiveView('builder')} style={{ padding: '14px 32px', background: theme.primary, border: 'none', borderRadius: 30, color: theme.primaryText, cursor: 'pointer', fontSize: 16, fontWeight: 600 }}>
+            Создать первый аутфит
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 20 }}>
+          {outfits.map((outfit: any) => (
+            <div key={outfit.id} onClick={() => setSelectedOutfit(outfit)} style={{ background: theme.card, borderRadius: 20, padding: 20, border: `1px solid ${theme.secondary}`, cursor: 'pointer' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: theme.text }}>{outfit.name}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                {outfit.items.map((item: any, idx: number) => (
+                  <img key={idx} src={item.img} alt={item.name} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 8 }} />
+                ))}
+              </div>
+              <p style={{ fontSize: 12, color: theme.textSecondary, margin: 0 }}>
+                {outfit.items.length} вещей • {new Date(outfit.createdAt).toLocaleDateString('ru-RU')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selectedOutfit && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, color: theme.text, fontSize: 24 }}>{selectedOutfit.name}</h3>
+              <button onClick={() => setSelectedOutfit(null)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
+              {selectedOutfit.items.map((item: any) => (
+                <div key={item.id} style={{ textAlign: 'center' }}>
+                  <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 12, objectFit: 'cover', marginBottom: 8 }} alt="" />
+                  <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{item.name}</div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => { setOutfits(outfits.filter((o: any) => o.id !== selectedOutfit.id)); setSelectedOutfit(null); }} style={{ width: '100%', padding: 14, background: theme.destructive, border: 'none', borderRadius: 12, color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: 16 }}>
+              Удалить аутфит
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OutfitBuilder = ({ clothes, outfits, setOutfits, onBack }: any) => {
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [outfitName, setOutfitName] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const theme = getTheme();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const { haptic, showAlert } = useTelegram();
+
+  let filteredClothes = clothes.filter((c: any) => !c.deletedAt);
+  if (filterCategory !== 'all') {
+    filteredClothes = filteredClothes.filter((c: any) => c.category === filterCategory);
+  }
+
+  const itemsByCategory = {
+    top: filteredClothes.filter((c: any) => c.category === 'top'),
+    bottom: filteredClothes.filter((c: any) => c.category === 'bottom'),
+    shoes: filteredClothes.filter((c: any) => c.category === 'shoes'),
+    accessory: filteredClothes.filter((c: any) => c.category === 'accessory'),
+  };
+
+  const toggleItem = (item: any) => {
+    const exists = selectedItems.find(i => i.id === item.id);
+    if (exists) {
+      setSelectedItems(selectedItems.filter(i => i.id !== item.id));
+    } else {
+      setSelectedItems([...selectedItems, item]);
+    }
+    haptic('light');
+  };
+
+  const saveOutfit = () => {
+    if (selectedItems.length === 0) { showAlert('Выберите хотя бы одну вещь'); return; }
+    if (!outfitName.trim()) { showAlert('Введите название аутфита'); return; }
+
+    const newOutfit = {
+      id: Date.now(),
+      name: outfitName,
+      items: selectedItems,
+      createdAt: new Date().toISOString(),
+    };
+    setOutfits([...outfits, newOutfit]);
+    haptic('medium');
+    showAlert('Аутфит сохранён!');
+    onBack();
+  };
+
+  const gridCols = isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
+
+  return (
+    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: isDesktop ? 28 : 24, cursor: 'pointer', marginBottom: 16, color: theme.text }}>← Назад</button>
+      
+      <div style={{ background: theme.primary, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
+        <h2 style={{ fontSize: isDesktop ? 32 : 28, margin: 0, color: theme.primaryText }}>Создание аутфита</h2>
+        <p style={{ color: theme.primaryText, opacity: 0.8, marginTop: 8 }}>Соберите свой идеальный образ</p>
+      </div>
+
+      <input type="text" placeholder="Название аутфита" value={outfitName} onChange={(e) => setOutfitName(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, marginBottom: 24, fontSize: 16, boxSizing: 'border-box' }} />
+      
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+          {['all', 'top', 'bottom', 'shoes', 'accessory'].map(cat => (
+            <button key={cat} onClick={() => setFilterCategory(cat)} style={{ padding: '8px 16px', borderRadius: 20, background: filterCategory === cat ? theme.primary : theme.card, border: `1px solid ${theme.secondary}`, color: filterCategory === cat ? theme.primaryText : theme.text, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 14 }}>
+              {cat === 'all' ? 'Все' : cat === 'top' ? 'Верх' : cat === 'bottom' ? 'Низ' : cat === 'shoes' ? 'Обувь' : 'Аксессуары'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedItems.length > 0 && (
+        <div style={{ marginBottom: 24, padding: 16, background: theme.card, borderRadius: 16, border: `1px solid ${theme.secondary}` }}>
+          <h3 style={{ margin: '0 0 12px 0', color: theme.text }}>Выбрано ({selectedItems.length})</h3>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {selectedItems.map((item: any) => (
+              <div key={item.id} style={{ position: 'relative', width: 60 }}>
+                <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, objectFit: 'cover' }} alt="" />
+                <button onClick={() => toggleItem(item)} style={{ position: 'absolute', top: -4, right: -4, background: theme.destructive, border: 'none', borderRadius: 10, width: 20, height: 20, color: 'white', fontSize: 12, cursor: 'pointer' }}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <h3 style={{ color: theme.text, marginBottom: 12 }}>Верх ({itemsByCategory.top.length})</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
+        {itemsByCategory.top.map((item: any) => (
+          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
+        ))}
+      </div>
+
+      <h3 style={{ color: theme.text, marginBottom: 12 }}>Низ ({itemsByCategory.bottom.length})</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
+        {itemsByCategory.bottom.map((item: any) => (
+          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
+        ))}
+      </div>
+
+      <h3 style={{ color: theme.text, marginBottom: 12 }}>Обувь ({itemsByCategory.shoes.length})</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
+        {itemsByCategory.shoes.map((item: any) => (
+          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
+        ))}
+      </div>
+
+      <h3 style={{ color: theme.text, marginBottom: 12 }}>Аксессуары ({itemsByCategory.accessory.length})</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
+        {itemsByCategory.accessory.map((item: any) => (
+          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
+        ))}
+      </div>
+
+      <button onClick={saveOutfit} style={{ width: '100%', padding: isDesktop ? 18 : 16, background: theme.primary, border: 'none', borderRadius: 14, fontSize: isDesktop ? 18 : 16, fontWeight: 600, cursor: 'pointer', marginTop: 20, color: theme.primaryText }}>
+        СОХРАНИТЬ АУТФИТ
+      </button>
+    </div>
+  );
+};
+
+// Basket with deleted items
+const BasketPage = ({ clothes, setClothes }: any) => {
+  const theme = getTheme();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const { haptic, showAlert } = useTelegram();
+
+  const deletedItems = clothes.filter((c: any) => c.deletedAt);
+  
+  const restoreItem = (itemId: number) => {
+    setClothes(clothes.map((c: any) => c.id === itemId ? { ...c, deletedAt: null } : c));
+    haptic('light');
+    showAlert('Вещь восстановлена');
+  };
+
+  const restoreAll = () => {
+    if (deletedItems.length > 0) {
+      setClothes(clothes.map((c: any) => ({ ...c, deletedAt: null })));
+      haptic('medium');
+      showAlert('Все вещи восстановлены');
+    }
+  };
+
+  const permanentDelete = (itemId: number) => {
+    setClothes(clothes.filter((c: any) => c.id !== itemId));
+    haptic('heavy');
+    showAlert('Вещь удалена навсегда');
+  };
+
+  const clearBasket = () => {
+    if (deletedItems.length > 0) {
+      setClothes(clothes.filter((c: any) => !c.deletedAt));
+      haptic('heavy');
+      showAlert('Корзина очищена');
+    }
+  };
+
+  const getDaysLeft = (deletedAt: string) => {
+    const deletedTime = new Date(deletedAt).getTime();
+    const twoWeeks = 14 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const remaining = twoWeeks - (now - deletedTime);
+    return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
+  };
+
+  const getCategoryName = (category: string) => {
+    switch(category) {
+      case 'top': return 'Верх';
+      case 'bottom': return 'Низ';
+      case 'shoes': return 'Обувь';
+      case 'accessory': return 'Аксессуар';
+      default: return category;
+    }
+  };
+
+  return (
+    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Корзина</h1>
+          <p style={{ color: theme.textSecondary, marginTop: 4, fontSize: 14 }}>
+            {deletedItems.length} {deletedItems.length === 1 ? 'вещь' : deletedItems.length < 5 ? 'вещи' : 'вещей'} • удалятся через 14 дней
+          </p>
+        </div>
+        {deletedItems.length > 0 && (
+          <button onClick={clearBasket} style={{ padding: '8px 16px', background: theme.destructive, border: 'none', borderRadius: 20, color: theme.primaryText, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+            Очистить
+          </button>
+        )}
+      </div>
+
+      {deletedItems.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
+          <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>Корзина пуста</p>
+          <p style={{ color: theme.textSecondary, fontSize: 14 }}>Удалённые вещи появятся здесь</p>
+        </div>
+      ) : (
+        <>
+          {deletedItems.length > 1 && (
+            <button onClick={restoreAll} style={{ width: '100%', padding: 14, background: theme.success, border: 'none', borderRadius: 12, color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: 16, marginBottom: 20 }}>
+              Восстановить все
+            </button>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 16 }}>
+            {deletedItems.map((item: any) => {
+              const daysLeft = getDaysLeft(item.deletedAt);
+              return (
+                <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 16, border: `1px solid ${theme.secondary}`, position: 'relative' }}>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <img src={item.img} alt={item.name} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 12, opacity: 0.7 }} />
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: '0 0 8px 0', fontSize: 16, color: theme.text }}>{item.name}</h3>
+                      <p style={{ margin: '4px 0', fontSize: 13, color: theme.textSecondary }}>
+                        Категория: {getCategoryName(item.category)}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: 13, color: theme.textSecondary }}>
+                        Сезон: {СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: 12, color: daysLeft <= 3 ? theme.destructive : theme.accent, fontWeight: 500 }}>
+                        Осталось {daysLeft} {daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button onClick={() => restoreItem(item.id)} style={{ flex: 1, padding: 10, background: theme.success, border: 'none', borderRadius: 10, color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                      Восстановить
+                    </button>
+                    <button onClick={() => permanentDelete(item.id)} style={{ flex: 1, padding: 10, background: theme.destructive, border: 'none', borderRadius: 10, color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const PhotoPicker = ({ onImageSelected, theme }: any) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -788,14 +887,9 @@ const PhotoPicker = ({ onImageSelected, theme }: any) => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        alert('Максимальный размер файла — 10 МБ');
-        return;
-      }
+      if (file.size > 10 * 1024 * 1024) { alert('Максимальный размер файла — 10 МБ'); return; }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        onImageSelected(reader.result as string, file.name.split('.')[0]);
-      };
+      reader.onloadend = () => { onImageSelected(reader.result as string, file.name.split('.')[0]); };
       reader.readAsDataURL(file);
     }
     setShowOptions(false);
@@ -804,10 +898,7 @@ const PhotoPicker = ({ onImageSelected, theme }: any) => {
   const handleCameraSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        alert('Максимальный размер файла — 10 МБ');
-        return;
-      }
+      if (file.size > 10 * 1024 * 1024) { alert('Максимальный размер файла — 10 МБ'); return; }
       const reader = new FileReader();
       reader.onloadend = () => {
         const fileName = `photo_${new Date().toISOString().slice(0, 19)}`;
@@ -838,16 +929,14 @@ const PhotoPicker = ({ onImageSelected, theme }: any) => {
         <div style={{ color: theme.text, marginBottom: 4, fontWeight: 500 }}>Добавить фото</div>
         <div style={{ fontSize: 12, color: theme.textSecondary }}>Нажмите чтобы выбрать или сфотографировать</div>
       </div>
-
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
       <input id="camera-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleCameraSelect} style={{ display: 'none' }} capture="environment" />
-
       {showOptions && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: "transparent", borderRadius: 24, padding: 24, width: '90%', maxWidth: 320, textAlign: 'center' }}>
+          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '90%', maxWidth: 320, textAlign: 'center' }}>
             <h3 style={{ marginBottom: 20, color: theme.text }}>Выберите источник</h3>
             <button onClick={() => { fileInputRef.current?.click(); setShowOptions(false); }} style={{ width: '100%', padding: 14, background: theme.primary, border: 'none', borderRadius: 12, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', marginBottom: 12, fontSize: 16 }}>📁 Выбрать из галереи</button>
-            <button onClick={() => { document.getElementById('camera-input')?.click(); setShowOptions(false); }} style={{ width: '100%', padding: 14, background: theme.secondary, border: 'none', borderRadius: 12, color: theme.text, fontWeight: 600, cursor: 'pointer', marginBottom: 12, fontSize: 16 }}>�� Сделать снимок</button>
+            <button onClick={() => { document.getElementById('camera-input')?.click(); setShowOptions(false); }} style={{ width: '100%', padding: 14, background: theme.secondary, border: 'none', borderRadius: 12, color: theme.text, fontWeight: 600, cursor: 'pointer', marginBottom: 12, fontSize: 16 }}>📷 Сделать снимок</button>
             <button onClick={() => setShowOptions(false)} style={{ width: '100%', padding: 14, background: 'none', border: `1px solid ${theme.secondary}`, borderRadius: 12, color: theme.textSecondary, cursor: 'pointer', fontSize: 16 }}>Отмена</button>
           </div>
         </div>
@@ -856,7 +945,6 @@ const PhotoPicker = ({ onImageSelected, theme }: any) => {
   );
 };
 
-// main page with wardrobe
 const WardrobeGrid = ({ clothes, setClothes }: any) => {
   const [showAdd, setShowAdd] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -886,14 +974,9 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
     if (!newImage) { showAlert('Добавьте фото вещи'); return; }
     
     const newItem = {
-      id: Date.now(), 
-      name: newName, 
-      category: newCategory, 
-      season: newSeason,
-      color: newColor,
-      material: newMaterial,
-      img: newImage,
-      createdAt: new Date().toISOString(),
+      id: Date.now(), name: newName, category: newCategory, season: newSeason,
+      color: newColor, material: newMaterial, img: newImage,
+      createdAt: new Date().toISOString(), deletedAt: null,
     };
     setClothes([newItem, ...clothes]);
     setShowAdd(false);
@@ -906,29 +989,18 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
   const deleteItem = (id: number) => {
     setClothes(clothes.map((c: any) => c.id === id ? { ...c, deletedAt: new Date().toISOString() } : c));
     haptic('light');
+    showAlert('Вещь перемещена в корзину');
   };
 
   let visibleClothes = clothes.filter((i: any) => !i.deletedAt);
   
-  // choose filters
-  if (filterCategory !== 'all') {
-    visibleClothes = visibleClothes.filter((c: any) => c.category === filterCategory);
-  }
-  if (filterSeason) {
-    visibleClothes = visibleClothes.filter((c: any) => c.season === filterSeason);
-  }
-  if (filterColor) {
-    visibleClothes = visibleClothes.filter((c: any) => c.color === filterColor);
-  }
-  if (filterMaterial !== 'all') {
-    visibleClothes = visibleClothes.filter((c: any) => c.material === filterMaterial);
-  }
-  // searching by name
+  if (filterCategory !== 'all') visibleClothes = visibleClothes.filter((c: any) => c.category === filterCategory);
+  if (filterSeason) visibleClothes = visibleClothes.filter((c: any) => c.season === filterSeason);
+  if (filterColor) visibleClothes = visibleClothes.filter((c: any) => c.color === filterColor);
+  if (filterMaterial !== 'all') visibleClothes = visibleClothes.filter((c: any) => c.material === filterMaterial);
   if (searchQuery.trim()) {
     const query = searchQuery.toLowerCase().trim();
-    visibleClothes = visibleClothes.filter((c: any) => 
-      c.name.toLowerCase().includes(query)
-    );
+    visibleClothes = visibleClothes.filter((c: any) => c.name.toLowerCase().includes(query));
   }
 
   const gridCols = isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)';
@@ -955,85 +1027,35 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
           <h1 style={{ fontSize: isDesktop ? 40 : 32, fontWeight: 700, color: theme.primary, margin: 0, fontFamily: "Playfair Display, serif", letterSpacing: "-0.02em" }}>Мой гардероб</h1>
           <p style={{ color: theme.textSecondary, marginTop: 4, fontSize: 14 }}>{visibleClothes.length} вещей</p>
         </div>
-        <button 
-          onClick={() => setShowSearch(true)} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            cursor: 'pointer', 
-            color: theme.primary, 
-            padding: 0,
-            width: 40,
-            height: 40,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <button onClick={() => setShowSearch(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.primary, padding: 0, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <SmallSearchIcon />
         </button>
       </div>
 
       {showSearch && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.95)',
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          padding: isDesktop ? 40 : 20,
-        }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 2000, display: 'flex', flexDirection: 'column', padding: isDesktop ? 40 : 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-            <button onClick={() => setShowSearch(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.text }}>
-              <CloseIcon />
-            </button>
-            <input
-              type="text"
-              placeholder="Поиск вещей..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-              style={{
-                flex: 1,
-                padding: 14,
-                borderRadius: 30,
-                border: `1px solid ${theme.secondary}`,
-                background: "transparent",
-                color: theme.text,
-                fontSize: 16,
-                outline: 'none',
-              }}
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.textSecondary, fontSize: 14 }}
-              >
-                Очистить
-              </button>
-            )}
+            <button onClick={() => setShowSearch(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.text }}><CloseIcon /></button>
+            <input type="text" placeholder="Поиск вещей..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} autoFocus style={{ flex: 1, padding: 14, borderRadius: 30, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, fontSize: 16, outline: 'none' }} />
+            {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.textSecondary, fontSize: 14 }}>Очистить</button>}
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {visibleClothes.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && searchQuery ? (
+            {visibleClothes.length === 0 && searchQuery ? (
               <div style={{ textAlign: 'center', padding: 60, color: theme.textSecondary }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
                 <p>Ничего не найдено для "{searchQuery}"</p>
               </div>
             ) : searchQuery && (
               <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 16 }}>
-                {visibleClothes.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map((item: any) => (
-                  <div key={item.id} style={{ background: "transparent", borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
+                {visibleClothes.map((item: any) => (
+                  <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
                     <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, marginBottom: 8 }} alt="" />
                     <div style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{item.name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                       <span style={{ fontSize: 11, color: theme.textSecondary }}>{getCategoryName(item.category)}</span>
                       <span style={{ fontSize: 10, color: СЕЗОНЫ.find((s: any) => s.id === item.season)?.color }}>{СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}</span>
                     </div>
-                    <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(68, 47, 41, 0.8)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
+                    <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(229, 115, 115, 0.9)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
                   </div>
                 ))}
               </div>
@@ -1042,28 +1064,10 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
         </div>
       )}
 
-      {/* filters */}
-      <FilterPills 
-        filterCategory={filterCategory}
-        setFilterCategory={setFilterCategory}
-        filterColor={filterColor}
-        setFilterColor={setFilterColor}
-        filterSeason={filterSeason}
-        setFilterSeason={setFilterSeason}
-        filterMaterial={filterMaterial}
-        setFilterMaterial={setFilterMaterial}
-        theme={theme}
-        isDesktop={isDesktop}
-      />
+      <FilterPills filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterColor={filterColor} setFilterColor={setFilterColor} filterSeason={filterSeason} setFilterSeason={setFilterSeason} filterMaterial={filterMaterial} setFilterMaterial={setFilterMaterial} theme={theme} isDesktop={isDesktop} />
 
-      {/* Empty or list of items */}
       {visibleClothes.length === 0 && !searchQuery ? (
-        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: "transparent", borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
-          <img 
-            src="/wardrobe-icon.png" 
-            alt="Wardrobe" 
-            style={{ width: 350, height: 270, marginBottom: 16, opacity: 0.6 }} 
-          />
+        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
           <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>Добавьте первую вещь в гардероб</p>
           <button onClick={() => setShowAdd(true)} style={{ padding: '14px 32px', background: theme.primary, border: 'none', borderRadius: 30, color: theme.primaryText, cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <PlusIcon /> Добавить вещь
@@ -1071,30 +1075,26 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
         </div>
       ) : visibleClothes.length === 0 && searchQuery ? (
         <div style={{ textAlign: 'center', padding: 60, color: theme.textSecondary }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}></div>
           <p>Ничего не найдено для "{searchQuery}"</p>
         </div>
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 16 }}>
             {visibleClothes.map((item: any) => (
-              <div key={item.id} style={{ background: "transparent", borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
+              <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
                 <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, marginBottom: 8 }} alt="" />
                 <div style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{item.name}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                   <span style={{ fontSize: 11, color: theme.textSecondary }}>{getCategoryName(item.category)}</span>
                   <span style={{ fontSize: 10, color: СЕЗОНЫ.find((s: any) => s.id === item.season)?.color }}>{СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}</span>
                 </div>
-                {item.material && (
-                  <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>
-                    {getMaterialName(item.material)}
-                  </div>
-                )}
-                <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(68, 47, 41, 0.8)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
+                {item.material && <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>{getMaterialName(item.material)}</div>}
+                <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(229, 115, 115, 0.9)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
               </div>
             ))}
           </div>
-          <button onClick={() => setShowAdd(true)} style={{ position: 'fixed', bottom: 100, right: isDesktop ? 'calc(50% - 360px)' : 20, width: 56, height: 56, borderRadius: 28, background: theme.primary, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(68, 47, 41, 0.3)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.primaryText }}>
+          <button onClick={() => setShowAdd(true)} style={{ position: 'fixed', bottom: 100, right: isDesktop ? 'calc(50% - 360px)' : 20, width: 56, height: 56, borderRadius: 28, background: theme.primary, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(55, 54, 53, 0.3)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.primaryText }}>
             <PlusIcon />
           </button>
         </>
@@ -1102,7 +1102,7 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
 
       {showAdd && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: 20 }}>
-          <div style={{ background: 'theme.card', borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0, color: theme.text, fontSize: 24 }}>➕ Новая вещь</h3>
               <button onClick={() => { setShowAdd(false); setNewImage(null); setNewName(''); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
@@ -1114,7 +1114,7 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: 16, overflow: 'hidden', marginBottom: 8 }}>
                   <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(68, 47, 41, 0.8)', border: 'none', borderRadius: 20, padding: '4px 12px', color: 'white', cursor: 'pointer', fontSize: 12 }}>Заменить фото</button>
+                  <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(55, 54, 53, 0.8)', border: 'none', borderRadius: 20, padding: '4px 12px', color: 'white', cursor: 'pointer', fontSize: 12 }}>Заменить фото</button>
                 </div>
               </div>
             )}
@@ -1151,16 +1151,13 @@ const WardrobeGrid = ({ clothes, setClothes }: any) => {
   );
 };
 
-// Calendar
 const WearCalendar = ({ history, clothes, setHistory }: any) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showSelector, setShowSelector] = useState(false);
   const theme = getTheme();
   const isDesktop = useMediaQuery('(min-width: 768px)');
 
-  const getWornItemsForDate = (date: string) => {
-    return history.filter((h: any) => h.date === date).map((h: any) => h.itemId);
-  };
+  const getWornItemsForDate = (date: string) => history.filter((h: any) => h.date === date).map((h: any) => h.itemId);
 
   const toggleWearItem = (itemId: number) => {
     const wornItems = getWornItemsForDate(selectedDate);
@@ -1189,16 +1186,10 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 
   const getTopItems = () => {
     const stats = getItemStats();
-    return Object.entries(stats)
-      .map(([id, count]) => ({ id: parseInt(id), count: count as number }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    return Object.entries(stats).map(([id, count]) => ({ id: parseInt(id), count: count as number })).sort((a, b) => b.count - a.count).slice(0, 5);
   };
 
-  const wornItemsOnDate = clothes.filter((item: any) => 
-    !item.deletedAt && getWornItemsForDate(selectedDate).includes(item.id)
-  );
-
+  const wornItemsOnDate = clothes.filter((item: any) => !item.deletedAt && getWornItemsForDate(selectedDate).includes(item.id));
   const itemStats = getItemStats();
   const topItems = getTopItems();
   const uniqueDates = getUniqueDates();
@@ -1223,28 +1214,28 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 
   return (
     <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ background: "transparent", borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
+      <div style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
         <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Календарь носки</h1>
-        <p style={{ color: theme.primaryText, opacity: 0.8, marginTop: 8 }}>Отслеживайте как часто носите вещи</p>
+        <p style={{ color: theme.textSecondary, marginTop: 8 }}>Отслеживайте как часто носите вещи</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div style={{ background: "transparent", borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
+        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{totalWears}</div>
           <div style={{ fontSize: 12, color: theme.textSecondary }}>всего отметок</div>
         </div>
-        <div style={{ background: "transparent", borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
+        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{uniqueItemsWorn}</div>
           <div style={{ fontSize: 12, color: theme.textSecondary }}>вещей в ротации</div>
         </div>
-        <div style={{ background: "transparent", borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
+        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{uniqueDates.length}</div>
           <div style={{ fontSize: 12, color: theme.textSecondary }}>дней с отметками</div>
         </div>
       </div>
 
       {topItems.length > 0 && (
-        <div style={{ background: "transparent", borderRadius: 16, padding: 20, marginBottom: 24, border: `1px solid ${theme.secondary}` }}>
+        <div style={{ background: theme.card, borderRadius: 16, padding: 20, marginBottom: 24, border: `1px solid ${theme.secondary}` }}>
           <h3 style={{ marginBottom: 16, color: theme.text }}>Чаще всего носите</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {topItems.map((item, index) => {
@@ -1269,54 +1260,24 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 
       <div style={{ marginBottom: 24 }}>
         <label style={{ display: 'block', marginBottom: 8, color: theme.textSecondary }}>Выберите дату</label>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          style={{
-            width: '100%',
-            padding: 14,
-            borderRadius: 12,
-            border: `1px solid ${theme.secondary}`,
-            background: "transparent",
-            color: theme.text,
-            fontSize: 16,
-            cursor: 'pointer',
-          }}
-        />
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, fontSize: 16, cursor: 'pointer' }} />
       </div>
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0, color: theme.text }}>
-            {getDayName(selectedDate)}, {selectedDate.split('-').reverse().join('.')}
-          </h3>
-          <button
-            onClick={() => setShowSelector(true)}
-            style={{
-              padding: '10px 20px',
-              background: theme.primary,
-              border: 'none',
-              borderRadius: 25,
-              color: theme.primaryText,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: 14,
-            }}
-          >
-            + Отметить
-          </button>
+          <h3 style={{ margin: 0, color: theme.text }}>{getDayName(selectedDate)}, {selectedDate.split('-').reverse().join('.')}</h3>
+          <button onClick={() => setShowSelector(true)} style={{ padding: '10px 20px', background: theme.primary, border: 'none', borderRadius: 25, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>+ Отметить</button>
         </div>
 
         {wornItemsOnDate.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, background: "transparent", borderRadius: 16, border: `1px solid ${theme.secondary}` }}>
+          <div style={{ textAlign: 'center', padding: 40, background: theme.card, borderRadius: 16, border: `1px solid ${theme.secondary}` }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>👔</div>
             <p style={{ color: theme.textSecondary }}>Ничего не отмечено на этот день</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 12 }}>
             {wornItemsOnDate.map((item: any) => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: "transparent", padding: 12, borderRadius: 12, border: `1px solid ${theme.secondary}` }}>
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: theme.card, padding: 12, borderRadius: 12, border: `1px solid ${theme.secondary}` }}>
                 <img src={item.img} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} alt="" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500, color: theme.text }}>{item.name}</div>
@@ -1330,26 +1291,8 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
       </div>
 
       {showSelector && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'flex-end',
-        }}>
-          <div style={{
-            background: "transparent",
-            width: '100%',
-            maxHeight: '80vh',
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            padding: 24,
-            overflowY: 'auto',
-          }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ background: theme.card, width: '100%', maxHeight: '80vh', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0, color: theme.text }}>Отметить вещи на {selectedDate}</h3>
               <button onClick={() => setShowSelector(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
@@ -1358,45 +1301,16 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
               {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
                 const isWorn = getWornItemsForDate(selectedDate).includes(item.id);
                 return (
-                  <div
-                    key={item.id}
-                    onClick={() => toggleWearItem(item.id)}
-                    style={{
-                      background: theme.bg,
-                      padding: 12,
-                      borderRadius: 12,
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      border: isWorn ? `2px solid ${theme.primary}` : `1px solid ${theme.secondary}`,
-                      opacity: isWorn ? 1 : 0.7,
-                    }}
-                  >
+                  <div key={item.id} onClick={() => toggleWearItem(item.id)} style={{ background: theme.bg, padding: 12, borderRadius: 12, textAlign: 'center', cursor: 'pointer', border: isWorn ? `2px solid ${theme.primary}` : `1px solid ${theme.secondary}`, opacity: isWorn ? 1 : 0.7 }}>
                     <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, objectFit: 'cover', marginBottom: 8 }} alt="" />
                     <div style={{ fontSize: 12, fontWeight: 500, color: theme.text }}>{item.name}</div>
-                    <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>
-                      {itemStats[item.id] || 0} раз всего
-                    </div>
+                    <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>{itemStats[item.id] || 0} раз всего</div>
                     {isWorn && <div style={{ marginTop: 4, fontSize: 11, color: theme.primary, fontWeight: 600 }}>Отмечено</div>}
                   </div>
                 );
               })}
             </div>
-            <button
-              onClick={() => setShowSelector(false)}
-              style={{
-                width: '100%',
-                padding: 14,
-                background: theme.primary,
-                border: 'none',
-                borderRadius: 12,
-                color: theme.primaryText,
-                fontWeight: 600,
-                cursor: 'pointer',
-                marginTop: 20,
-              }}
-            >
-              Готово
-            </button>
+            <button onClick={() => setShowSelector(false)} style={{ width: '100%', padding: 14, background: theme.primary, border: 'none', borderRadius: 12, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', marginTop: 20 }}>Готово</button>
           </div>
         </div>
       )}
@@ -1405,11 +1319,15 @@ const WearCalendar = ({ history, clothes, setHistory }: any) => {
 };
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<'wardrobe' | 'capsules' | 'calendar'>('wardrobe');
+  const [currentScreen, setCurrentScreen] = useState<'wardrobe' | 'capsules' | 'calendar' | 'outfits' | 'basket'>('wardrobe');
   const [onboardingComplete, setOnboardingComplete] = useLocalStorage('onboardingComplete', false);
   const [clothes, setClothes] = useLocalStorage<any[]>('clothes', []);
   const [capsules, setCapsules] = useLocalStorage<any[]>('capsules', []);
+  const [outfits, setOutfits] = useLocalStorage<any[]>('outfits', []);
   const [history, setHistory] = useLocalStorage<any[]>('history', []);
+
+  // autocleaner after 2 weeks
+  useAutoCleanup(clothes, setClothes);
 
   useEffect(() => {
     const theme = getTheme();
@@ -1417,14 +1335,18 @@ function App() {
     document.body.style.color = theme.text;
   }, []);
 
+  const basketCount = clothes.filter((c: any) => c.deletedAt).length;
+
   if (!onboardingComplete) return <OnboardingSlider onComplete={() => setOnboardingComplete(true)} />;
 
   return (
     <div style={{ minHeight: '100vh', background: getTheme().bg, paddingBottom: 80 }}>
       {currentScreen === 'wardrobe' && <WardrobeGrid clothes={clothes} setClothes={setClothes} />}
+      {currentScreen === 'outfits' && <OutfitsPage clothes={clothes} outfits={outfits} setOutfits={setOutfits} />}
       {currentScreen === 'capsules' && <CapsulesPage capsules={capsules} setCapsules={setCapsules} clothes={clothes} />}
+      {currentScreen === 'basket' && <BasketPage clothes={clothes} setClothes={setClothes} />}
       {currentScreen === 'calendar' && <WearCalendar history={history} clothes={clothes} setHistory={setHistory} />}
-      <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
+      <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} basketCount={basketCount} />
     </div>
   );
 }
