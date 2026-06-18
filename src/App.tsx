@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
-// Colors
 const getTheme = () => {
   return {
     bg: '#E6E5E3',
@@ -91,1266 +90,1029 @@ const useTelegram = () => {
     }
   };
   
-  const showAlert = (message: string) => {
-    if (tg?.showAlert) tg.showAlert(message);
-    else alert(message);
-  };
-  
-  return { haptic, showAlert, isReady: !!tg };
+  return { haptic };
 };
 
-const SmallSearchIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="9" r="6" stroke="#373635" strokeWidth="1.5" fill="none"/>
-    <path d="M13 13L17 17" stroke="#373635" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#373635" strokeWidth="2">
-    <path d="m6 9 6 6 6-6"/>
-  </svg>
-);
-
-const PlusIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 5v14M5 12h14"/>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M18 6L6 18M6 6l12 12"/>
-  </svg>
-);
-const useAutoCleanup = (clothes: any[], setClothes: (items: any[]) => void) => {
-  useEffect(() => {
-    const cleanup = () => {
-      const now = Date.now();
-      const twoWeeks = 14 * 24 * 60 * 60 * 1000;
-      const cleaned = clothes.filter((item: any) => {
-        if (item.deletedAt) {
-          const deletedTime = new Date(item.deletedAt).getTime();
-          return (now - deletedTime) < twoWeeks;
-        }
-        return true;
-      });
-      if (cleaned.length !== clothes.length) {
-        setClothes(cleaned);
-      }
-    };
-    cleanup();
-    const interval = setInterval(cleanup, 60 * 60 * 1000); // каждый час
-    return () => clearInterval(interval);
-  }, [clothes, setClothes]);
-};
-
-const OnboardingSlider = ({ onComplete }: { onComplete: () => void }) => {
-  const [slide, setSlide] = useState(0);
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  
-  const slides = [
-    { title: 'CLOSET FLOW', description: 'Управляй гардеробом со стилем', icon: '' },
-    { title: 'КАПСУЛЫ 8-3', description: '8 вещей = 3 образа' },
-    { title: 'КАПСУЛЫ 10-5', description: '10 вещей = 5 образов' },
-  ];
-
-  return (
-    <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: isDesktop ? 60 : 40 }}>
-      <div style={{ textAlign: 'center', maxWidth: isDesktop ? 500 : '100%' }}>
-        <div style={{ fontSize: isDesktop ? 100 : 80, marginBottom: 20 }}>{slides[slide].icon}</div>
-        <h1 style={{ fontSize: isDesktop ? 40 : 32, fontWeight: 700, color: theme.primary, marginBottom: 12 }}>{slides[slide].title}</h1>
-        <p style={{ color: theme.textSecondary, fontSize: isDesktop ? 18 : 16, marginBottom: 40 }}>{slides[slide].description}</p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 40 }}>
-          {slides.map((_, i) => <div key={i} style={{ width: 8, height: 8, borderRadius: 4, background: i === slide ? theme.primary : theme.secondary }} />)}
-        </div>
-        <button onClick={() => slide === 2 ? onComplete() : setSlide(slide + 1)} style={{ padding: `${isDesktop ? '16px' : '14px'} ${isDesktop ? '40px' : '32px'}`, background: theme.primary, border: 'none', borderRadius: 30, color: theme.primaryText, fontSize: isDesktop ? 18 : 16, fontWeight: 600, cursor: 'pointer' }}>
-          {slide === 2 ? 'НАЧАТЬ' : 'ДАЛЕЕ'}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const BottomNavBar = ({ currentScreen, onScreenChange, basketCount }: any) => {
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  
-  const navStyle: React.CSSProperties = {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: theme.primary,
-    display: 'flex',
-    padding: isDesktop ? '16px 0 24px' : '12px 0 20px',
-    zIndex: 100,
-  };
-  
-  if (isDesktop) {
-    navStyle.maxWidth = 800;
-    navStyle.margin = '0 auto';
-    navStyle.left = '50%';
-    navStyle.transform = 'translateX(-50%)';
-    navStyle.borderRadius = '30px 30px 0 0';
-  }
-
-  const tabs = [
-    { id: 'outfits', label: 'Аутфиты', icon: '👔' },
-    { id: 'capsules', label: 'Капсулы', icon: '✨' },
-    { id: 'wardrobe', label: 'Гардероб', icon: '👕' },
-    { id: 'basket', label: 'Корзина', icon: '🗑️', badge: basketCount },
-    { id: 'calendar', label: 'Календарь', icon: '📅' },
-  ];
-
-  return (
-    <div style={navStyle}>
-      {tabs.map(tab => {
-        const isActive = currentScreen === tab.id;
-        return (
-          <button 
-            key={tab.id} 
-            onClick={() => onScreenChange(tab.id)} 
-            style={{ 
-              flex: 1, 
-              background: 'none', 
-              border: 'none', 
-              cursor: 'pointer', 
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              opacity: isActive ? 1 : 0.5,
-              color: theme.primaryText,
-              position: 'relative',
-            }}
-          >
-            <span style={{ fontSize: 24, position: 'relative' }}>
-              {tab.icon}
-              {tab.badge > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: -4,
-                  right: -8,
-                  background: theme.destructive,
-                  color: 'white',
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0 4px',
-                }}>
-                  {tab.badge}
-                </span>
-              )}
-            </span>
-            <span style={{ fontSize: isDesktop ? 11 : 10, fontWeight: 500 }}>{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-
-const ItemCard = ({ item, onSelect, isSelected, theme, isDesktop }: any) => {
-  const getCategoryName = (category: string) => {
-    switch(category) {
-      case 'top': return 'Верх';
-      case 'bottom': return 'Низ';
-      case 'shoes': return 'Обувь';
-      case 'accessory': return 'Аксессуар';
-      default: return category;
-    }
-  };
-
-  const getMaterialName = (materialId: string) => {
-    const material = МАТЕРИАЛЫ.find(m => m.id === materialId);
-    return material ? material.name : '';
-  };
-
-  return (
-    <div onClick={() => onSelect?.(item)} style={{ 
-      background: theme.card, 
-      borderRadius: isDesktop ? 20 : 16, 
-      padding: isDesktop ? 16 : 12, 
-      cursor: onSelect ? 'pointer' : 'default', 
-      border: isSelected ? `2px solid ${theme.primary}` : `1px solid ${theme.secondary}`,
-      transition: 'all 0.2s ease',
-    }}>
-      <img src={item.img} alt={item.name} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: isDesktop ? 16 : 12, marginBottom: 8 }} />
-      <div style={{ fontSize: isDesktop ? 16 : 14, fontWeight: 500, color: theme.text }}>{item.name}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ fontSize: isDesktop ? 12 : 11, color: theme.textSecondary }}>
-          {getCategoryName(item.category)}
-        </span>
-        <span style={{ fontSize: isDesktop ? 11 : 10, color: СЕЗОНЫ.find((s: any) => s.id === item.season)?.color }}>
-          {СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}
-        </span>
-      </div>
-      {item.material && (
-        <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>
-          {getMaterialName(item.material)}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const FilterPills = ({ 
-  filterCategory, 
-  setFilterCategory, 
-  filterColor, 
-  setFilterColor, 
-  filterSeason, 
-  setFilterSeason,
-  filterMaterial,
-  setFilterMaterial,
-  theme,
-  isDesktop
-}: any) => {
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-
-  const closeAllDropdowns = () => setOpenDropdown(null);
-  const toggleDropdown = (dropdownName: string) => {
-    setOpenDropdown(openDropdown === dropdownName ? null : dropdownName);
-  };
-
-  const getCategoryName = (id: string) => {
-    const cat = КАТЕГОРИИ.find(c => c.id === id);
-    return cat ? cat.name : 'Все';
-  };
-
-  return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => toggleDropdown('category')} style={{ padding: '8px 16px', borderRadius: 25, background: filterCategory !== 'all' ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterCategory !== 'all' ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {getCategoryName(filterCategory)} <ChevronDownIcon />
-        </button>
-        {openDropdown === 'category' && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            {КАТЕГОРИИ.map(cat => (
-              <button key={cat.id} onClick={() => { setFilterCategory(cat.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterCategory === cat.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => toggleDropdown('material')} style={{ padding: '8px 16px', borderRadius: 25, background: filterMaterial !== 'all' ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterMaterial !== 'all' ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          Материал {filterMaterial !== 'all' && `• ${МАТЕРИАЛЫ.find(m => m.id === filterMaterial)?.name}`} <ChevronDownIcon />
-        </button>
-        {openDropdown === 'material' && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, maxHeight: 300, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <button onClick={() => { setFilterMaterial('all'); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterMaterial === 'all' ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все материалы</button>
-            {МАТЕРИАЛЫ.map(material => (
-              <button key={material.id} onClick={() => { setFilterMaterial(material.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterMaterial === material.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>
-                {material.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => toggleDropdown('color')} style={{ padding: '8px 16px', borderRadius: 25, background: filterColor ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterColor ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          Цвет {filterColor && `• ${ЦВЕТА.find(c => c.id === filterColor)?.name}`} <ChevronDownIcon />
-        </button>
-        {openDropdown === 'color' && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 180, maxHeight: 300, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <button onClick={() => { setFilterColor(null); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все цвета</button>
-            {ЦВЕТА.map(color => (
-              <button key={color.id} onClick={() => { setFilterColor(color.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterColor === color.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 16, height: 16, borderRadius: 4, background: color.hex, border: '1px solid #ddd' }} />
-                {color.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => toggleDropdown('season')} style={{ padding: '8px 16px', borderRadius: 25, background: filterSeason ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: filterSeason ? theme.primaryText : theme.text, fontSize: isDesktop ? 14 : 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          Сезон {filterSeason && `• ${СЕЗОНЫ.find(s => s.id === filterSeason)?.name}`} <ChevronDownIcon />
-        </button>
-        {openDropdown === 'season' && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, background: theme.card, border: `1px solid ${theme.secondary}`, borderRadius: 12, padding: 8, zIndex: 1000, minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <button onClick={() => { setFilterSeason(null); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13 }}>Все сезоны</button>
-            {СЕЗОНЫ.map(season => (
-              <button key={season.id} onClick={() => { setFilterSeason(season.id); closeAllDropdowns(); }} style={{ width: '100%', padding: '8px 12px', background: filterSeason === season.id ? theme.secondary : 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: theme.text, borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 6, background: season.color }} />
-                {season.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const CapsuleBuilder = ({ clothes, capsules, setCapsules, onBack, maxItems, type, title }: any) => {
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
-  const [filterSeason, setFilterSeason] = useState<string | null>(null);
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  const { haptic, showAlert } = useTelegram();
-
-  let filteredClothes = clothes.filter((c: any) => !c.deletedAt);
-  if (filterSeason) filteredClothes = filteredClothes.filter((c: any) => c.season === filterSeason);
-
-  const itemsByCategory = {
-    top: filteredClothes.filter((c: any) => c.category === 'top'),
-    bottom: filteredClothes.filter((c: any) => c.category === 'bottom'),
-    shoes: filteredClothes.filter((c: any) => c.category === 'shoes'),
-    accessory: filteredClothes.filter((c: any) => c.category === 'accessory'),
-  };
-
-  const addToCapsule = (item: any) => {
-    if (selectedItems.length < maxItems && !selectedItems.find(i => i.id === item.id)) {
-      setSelectedItems([...selectedItems, item]);
-      haptic('light');
-    }
-  };
-
-  const removeFromCapsule = (itemId: number) => {
-    setSelectedItems(selectedItems.filter(i => i.id !== itemId));
-    haptic('light');
-  };
-
-  const saveCapsule = () => {
-    if (selectedItems.length === maxItems) {
-      const newCapsule = {
-        id: Date.now(), type, name: `${title} #${capsules.filter((c: any) => c.type === type).length + 1}`,
-        items: selectedItems, createdAt: new Date().toISOString(),
-      };
-      setCapsules([...capsules, newCapsule]);
-      setSelectedItems([]);
-      showAlert(`${title} сохранена!`);
-      haptic('medium');
-      onBack();
-    }
-  };
-
-  const gridCols = isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
-  const accessoryCols = isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)';
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: isDesktop ? 28 : 24, cursor: 'pointer', marginBottom: 16, color: theme.text }}>← Назад</button>
-      
-      <div style={{ background: theme.primary, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
-        <h2 style={{ fontSize: isDesktop ? 32 : 28, margin: 0, color: theme.primaryText }}>{title}</h2>
-        <p style={{ color: theme.primaryText, opacity: 0.8, marginTop: 8 }}>{maxItems} вещей → {maxItems === 8 ? '3' : '5'} образов</p>
-      </div>
-      
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
-          <button onClick={() => setFilterSeason(null)} style={{ padding: '6px 12px', borderRadius: 20, background: !filterSeason ? theme.primary : theme.card, border: `1px solid ${theme.primary}`, color: !filterSeason ? theme.primaryText : theme.text, cursor: 'pointer', whiteSpace: 'nowrap' }}>Все сезоны</button>
-          {СЕЗОНЫ.map(s => (
-            <button key={s.id} onClick={() => setFilterSeason(s.id)} style={{ padding: '6px 12px', borderRadius: 20, background: filterSeason === s.id ? s.color : theme.card, border: `1px solid ${theme.secondary}`, color: filterSeason === s.id ? '#0D0C0F' : theme.text, cursor: 'pointer', whiteSpace: 'nowrap' }}>{s.name}</button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: theme.textSecondary }}>Выбрано: {selectedItems.length}/{maxItems}</span>
-        <div style={{ flex: 1, marginLeft: 16, height: 4, background: theme.secondary, borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ width: `${(selectedItems.length / maxItems) * 100}%`, height: '100%', background: theme.primary, transition: 'width 0.3s' }} />
-        </div>
-      </div>
-
-      {selectedItems.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ color: theme.text, marginBottom: 12 }}>Выбрано ({selectedItems.length}/{maxItems})</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {selectedItems.map((item: any) => (
-              <div key={item.id} style={{ position: 'relative', width: isDesktop ? 80 : 60 }}>
-                <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, objectFit: 'cover' }} alt="" />
-                <button onClick={() => removeFromCapsule(item.id)} style={{ position: 'absolute', top: -4, right: -4, background: theme.destructive, border: 'none', borderRadius: 10, width: 20, height: 20, color: 'white', fontSize: 12, cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Верх ({itemsByCategory.top.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.top.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={addToCapsule} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Низ ({itemsByCategory.bottom.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.bottom.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={addToCapsule} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Обувь ({itemsByCategory.shoes.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.shoes.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={addToCapsule} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Аксессуары ({itemsByCategory.accessory.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: accessoryCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.accessory.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={addToCapsule} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      {selectedItems.length === maxItems && (
-        <button onClick={saveCapsule} style={{ width: '100%', padding: isDesktop ? 18 : 16, background: theme.primary, border: 'none', borderRadius: 14, fontSize: isDesktop ? 18 : 16, fontWeight: 600, cursor: 'pointer', marginTop: 20, color: theme.primaryText }}>
-          СОХРАНИТЬ
-        </button>
-      )}
-    </div>
-  );
-};
-
-const CapsulesPage = ({ capsules, setCapsules, clothes }: any) => {
-  const [activeCapsule, setActiveCapsule] = useState<string | null>(null);
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-
-  if (activeCapsule === '8-3') {
-    return <CapsuleBuilder clothes={clothes} capsules={capsules} setCapsules={setCapsules} onBack={() => setActiveCapsule(null)} maxItems={8} type="8-3" title="8-3 КАПСУЛА" />;
-  }
-  
-  if (activeCapsule === '10-5') {
-    return <CapsuleBuilder clothes={clothes} capsules={capsules} setCapsules={setCapsules} onBack={() => setActiveCapsule(null)} maxItems={10} type="10-5" title="10-5 КАПСУЛА" />;
-  }
-
-  const savedCapsules8 = capsules.filter((c: any) => c.type === '8-3');
-  const savedCapsules10 = capsules.filter((c: any) => c.type === '10-5');
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ background: 'transparent', borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
-        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>МОИ КАПСУЛЫ</h1>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 16, marginBottom: 32 }}>
-        <div onClick={() => setActiveCapsule('8-3')} style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
-          <h3 style={{ color: theme.text, marginBottom: 4 }}>8-3 Капсула</h3>
-          <p style={{ color: theme.textSecondary }}>8 вещей = 3 образа</p>
-        </div>
-        <div onClick={() => setActiveCapsule('10-5')} style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 28 : 24, cursor: 'pointer', border: `1px solid ${theme.secondary}`, textAlign: 'center' }}>
-          <h3 style={{ color: theme.text, marginBottom: 4 }}>10-5 Капсула</h3>
-          <p style={{ color: theme.textSecondary }}>10 вещей = 5 образов</p>
-        </div>
-      </div>
-
-      {(savedCapsules8.length > 0 || savedCapsules10.length > 0) && (
-        <div>
-          <h3 style={{ color: theme.text, marginBottom: 16 }}>📦 Сохранённые капсулы</h3>
-          {[...savedCapsules8, ...savedCapsules10].map((capsule: any) => (
-            <div key={capsule.id} style={{ background: theme.card, borderRadius: 16, padding: 16, marginBottom: 12, border: `1px solid ${theme.secondary}` }}>
-              <div style={{ fontWeight: 600, marginBottom: 12, color: theme.text }}>{capsule.name}</div>
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-                {capsule.items.map((item: any) => (
-                  <img key={item.id} src={item.img} style={{ width: 50, height: 50, borderRadius: 8, objectFit: 'cover' }} alt="" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Page with outfits
-const OutfitsPage = ({ clothes, outfits, setOutfits }: any) => {
-  const [activeView, setActiveView] = useState<'list' | 'builder'>('list');
-  const [selectedOutfit, setSelectedOutfit] = useState<any>(null);
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-
-  if (activeView === 'builder') {
-    return <OutfitBuilder clothes={clothes} outfits={outfits} setOutfits={setOutfits} onBack={() => setActiveView('list')} />;
-  }
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Мои аутфиты</h1>
-        <button onClick={() => setActiveView('builder')} style={{ padding: '12px 24px', background: theme.primary, border: 'none', borderRadius: 25, color: theme.primaryText, cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>+</span> Создать
-        </button>
-      </div>
-
-      {outfits.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}></div>
-          <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>У вас пока нет сохранённых аутфитов</p>
-          <button onClick={() => setActiveView('builder')} style={{ padding: '14px 32px', background: theme.primary, border: 'none', borderRadius: 30, color: theme.primaryText, cursor: 'pointer', fontSize: 16, fontWeight: 600 }}>
-            Создать первый аутфит
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 20 }}>
-          {outfits.map((outfit: any) => (
-            <div key={outfit.id} onClick={() => setSelectedOutfit(outfit)} style={{ background: theme.card, borderRadius: 20, padding: 20, border: `1px solid ${theme.secondary}`, cursor: 'pointer' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: theme.text }}>{outfit.name}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
-                {outfit.items.map((item: any, idx: number) => (
-                  <img key={idx} src={item.img} alt={item.name} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 8 }} />
-                ))}
-              </div>
-              <p style={{ fontSize: 12, color: theme.textSecondary, margin: 0 }}>
-                {outfit.items.length} вещей • {new Date(outfit.createdAt).toLocaleDateString('ru-RU')}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {selectedOutfit && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, color: theme.text, fontSize: 24 }}>{selectedOutfit.name}</h3>
-              <button onClick={() => setSelectedOutfit(null)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
-              {selectedOutfit.items.map((item: any) => (
-                <div key={item.id} style={{ textAlign: 'center' }}>
-                  <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 12, objectFit: 'cover', marginBottom: 8 }} alt="" />
-                  <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{item.name}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => { setOutfits(outfits.filter((o: any) => o.id !== selectedOutfit.id)); setSelectedOutfit(null); }} style={{ width: '100%', padding: 14, background: theme.destructive, border: 'none', borderRadius: 12, color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: 16 }}>
-              Удалить аутфит
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const OutfitBuilder = ({ clothes, outfits, setOutfits, onBack }: any) => {
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
-  const [outfitName, setOutfitName] = useState('');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  const { haptic, showAlert } = useTelegram();
-
-  let filteredClothes = clothes.filter((c: any) => !c.deletedAt);
-  if (filterCategory !== 'all') {
-    filteredClothes = filteredClothes.filter((c: any) => c.category === filterCategory);
-  }
-
-  const itemsByCategory = {
-    top: filteredClothes.filter((c: any) => c.category === 'top'),
-    bottom: filteredClothes.filter((c: any) => c.category === 'bottom'),
-    shoes: filteredClothes.filter((c: any) => c.category === 'shoes'),
-    accessory: filteredClothes.filter((c: any) => c.category === 'accessory'),
-  };
-
-  const toggleItem = (item: any) => {
-    const exists = selectedItems.find(i => i.id === item.id);
-    if (exists) {
-      setSelectedItems(selectedItems.filter(i => i.id !== item.id));
-    } else {
-      setSelectedItems([...selectedItems, item]);
-    }
-    haptic('light');
-  };
-
-  const saveOutfit = () => {
-    if (selectedItems.length === 0) { showAlert('Выберите хотя бы одну вещь'); return; }
-    if (!outfitName.trim()) { showAlert('Введите название аутфита'); return; }
-
-    const newOutfit = {
-      id: Date.now(),
-      name: outfitName,
-      items: selectedItems,
-      createdAt: new Date().toISOString(),
-    };
-    setOutfits([...outfits, newOutfit]);
-    haptic('medium');
-    showAlert('Аутфит сохранён!');
-    onBack();
-  };
-
-  const gridCols = isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: isDesktop ? 28 : 24, cursor: 'pointer', marginBottom: 16, color: theme.text }}>← Назад</button>
-      
-      <div style={{ background: theme.primary, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center' }}>
-        <h2 style={{ fontSize: isDesktop ? 32 : 28, margin: 0, color: theme.primaryText }}>Создание аутфита</h2>
-        <p style={{ color: theme.primaryText, opacity: 0.8, marginTop: 8 }}>Соберите свой идеальный образ</p>
-      </div>
-
-      <input type="text" placeholder="Название аутфита" value={outfitName} onChange={(e) => setOutfitName(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, marginBottom: 24, fontSize: 16, boxSizing: 'border-box' }} />
-      
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
-          {['all', 'top', 'bottom', 'shoes', 'accessory'].map(cat => (
-            <button key={cat} onClick={() => setFilterCategory(cat)} style={{ padding: '8px 16px', borderRadius: 20, background: filterCategory === cat ? theme.primary : theme.card, border: `1px solid ${theme.secondary}`, color: filterCategory === cat ? theme.primaryText : theme.text, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 14 }}>
-              {cat === 'all' ? 'Все' : cat === 'top' ? 'Верх' : cat === 'bottom' ? 'Низ' : cat === 'shoes' ? 'Обувь' : 'Аксессуары'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {selectedItems.length > 0 && (
-        <div style={{ marginBottom: 24, padding: 16, background: theme.card, borderRadius: 16, border: `1px solid ${theme.secondary}` }}>
-          <h3 style={{ margin: '0 0 12px 0', color: theme.text }}>Выбрано ({selectedItems.length})</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {selectedItems.map((item: any) => (
-              <div key={item.id} style={{ position: 'relative', width: 60 }}>
-                <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, objectFit: 'cover' }} alt="" />
-                <button onClick={() => toggleItem(item)} style={{ position: 'absolute', top: -4, right: -4, background: theme.destructive, border: 'none', borderRadius: 10, width: 20, height: 20, color: 'white', fontSize: 12, cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Верх ({itemsByCategory.top.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.top.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Низ ({itemsByCategory.bottom.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.bottom.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Обувь ({itemsByCategory.shoes.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.shoes.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <h3 style={{ color: theme.text, marginBottom: 12 }}>Аксессуары ({itemsByCategory.accessory.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 12, marginBottom: 24 }}>
-        {itemsByCategory.accessory.map((item: any) => (
-          <ItemCard key={item.id} item={item} onSelect={toggleItem} isSelected={!!selectedItems.find(i => i.id === item.id)} theme={theme} isDesktop={isDesktop} />
-        ))}
-      </div>
-
-      <button onClick={saveOutfit} style={{ width: '100%', padding: isDesktop ? 18 : 16, background: theme.primary, border: 'none', borderRadius: 14, fontSize: isDesktop ? 18 : 16, fontWeight: 600, cursor: 'pointer', marginTop: 20, color: theme.primaryText }}>
-        СОХРАНИТЬ АУТФИТ
-      </button>
-    </div>
-  );
-};
-
-// Basket with deleted items
-const BasketPage = ({ clothes, setClothes }: any) => {
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  const { haptic, showAlert } = useTelegram();
-
-  const deletedItems = clothes.filter((c: any) => c.deletedAt);
-  
-  const restoreItem = (itemId: number) => {
-    setClothes(clothes.map((c: any) => c.id === itemId ? { ...c, deletedAt: null } : c));
-    haptic('light');
-    showAlert('Вещь восстановлена');
-  };
-
-  const restoreAll = () => {
-    if (deletedItems.length > 0) {
-      setClothes(clothes.map((c: any) => ({ ...c, deletedAt: null })));
-      haptic('medium');
-      showAlert('Все вещи восстановлены');
-    }
-  };
-
-  const permanentDelete = (itemId: number) => {
-    setClothes(clothes.filter((c: any) => c.id !== itemId));
-    haptic('heavy');
-    showAlert('Вещь удалена навсегда');
-  };
-
-  const clearBasket = () => {
-    if (deletedItems.length > 0) {
-      setClothes(clothes.filter((c: any) => !c.deletedAt));
-      haptic('heavy');
-      showAlert('Корзина очищена');
-    }
-  };
-
-  const getDaysLeft = (deletedAt: string) => {
-    const deletedTime = new Date(deletedAt).getTime();
-    const twoWeeks = 14 * 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    const remaining = twoWeeks - (now - deletedTime);
-    return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
-  };
-
-  const getCategoryName = (category: string) => {
-    switch(category) {
-      case 'top': return 'Верх';
-      case 'bottom': return 'Низ';
-      case 'shoes': return 'Обувь';
-      case 'accessory': return 'Аксессуар';
-      default: return category;
-    }
-  };
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Корзина</h1>
-          <p style={{ color: theme.textSecondary, marginTop: 4, fontSize: 14 }}>
-            {deletedItems.length} {deletedItems.length === 1 ? 'вещь' : deletedItems.length < 5 ? 'вещи' : 'вещей'} • удалятся через 14 дней
-          </p>
-        </div>
-        {deletedItems.length > 0 && (
-          <button onClick={clearBasket} style={{ padding: '8px 16px', background: theme.destructive, border: 'none', borderRadius: 20, color: theme.primaryText, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-            Очистить
-          </button>
-        )}
-      </div>
-
-      {deletedItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
-          <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>Корзина пуста</p>
-          <p style={{ color: theme.textSecondary, fontSize: 14 }}>Удалённые вещи появятся здесь</p>
-        </div>
-      ) : (
-        <>
-          {deletedItems.length > 1 && (
-            <button onClick={restoreAll} style={{ width: '100%', padding: 14, background: theme.success, border: 'none', borderRadius: 12, color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: 16, marginBottom: 20 }}>
-              Восстановить все
-            </button>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 16 }}>
-            {deletedItems.map((item: any) => {
-              const daysLeft = getDaysLeft(item.deletedAt);
-              return (
-                <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 16, border: `1px solid ${theme.secondary}`, position: 'relative' }}>
-                  <div style={{ display: 'flex', gap: 16 }}>
-                    <img src={item.img} alt={item.name} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 12, opacity: 0.7 }} />
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ margin: '0 0 8px 0', fontSize: 16, color: theme.text }}>{item.name}</h3>
-                      <p style={{ margin: '4px 0', fontSize: 13, color: theme.textSecondary }}>
-                        Категория: {getCategoryName(item.category)}
-                      </p>
-                      <p style={{ margin: '4px 0', fontSize: 13, color: theme.textSecondary }}>
-                        Сезон: {СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}
-                      </p>
-                      <p style={{ margin: '4px 0', fontSize: 12, color: daysLeft <= 3 ? theme.destructive : theme.accent, fontWeight: 500 }}>
-                        Осталось {daysLeft} {daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => restoreItem(item.id)} style={{ flex: 1, padding: 10, background: theme.success, border: 'none', borderRadius: 10, color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                      Восстановить
-                    </button>
-                    <button onClick={() => permanentDelete(item.id)} style={{ flex: 1, padding: 10, background: theme.destructive, border: 'none', borderRadius: 10, color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                      Удалить
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-const PhotoPicker = ({ onImageSelected, theme }: any) => {
+const PhotoPicker = ({ onImageSelected }: any) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showOptions, setShowOptions] = useState(false);
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) { alert('Максимальный размер файла — 10 МБ'); return; }
-      const reader = new FileReader();
-      reader.onloadend = () => { onImageSelected(reader.result as string, file.name.split('.')[0]); };
-      reader.readAsDataURL(file);
-    }
-    setShowOptions(false);
-  };
-
-  const handleCameraSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) { alert('Максимальный размер файла — 10 МБ'); return; }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const fileName = `photo_${new Date().toISOString().slice(0, 19)}`;
-        onImageSelected(reader.result as string, fileName);
-      };
-      reader.readAsDataURL(file);
-    }
-    setShowOptions(false);
-  };
-
-  if (!isMobile) {
-    return (
-      <>
-        <div onClick={() => fileInputRef.current?.click()} style={{ border: `2px dashed ${theme.secondary}`, borderRadius: 16, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16, background: theme.bg }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>🖼️</div>
-          <div style={{ color: theme.text, marginBottom: 4, fontWeight: 500 }}>Выбрать фото</div>
-          <div style={{ fontSize: 12, color: theme.textSecondary }}>Нажмите чтобы выбрать файл</div>
-        </div>
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
-      </>
-    );
-  }
-
+  
   return (
     <>
-      <div onClick={() => setShowOptions(true)} style={{ border: `2px dashed ${theme.secondary}`, borderRadius: 16, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16, background: theme.bg }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>📷</div>
-        <div style={{ color: theme.text, marginBottom: 4, fontWeight: 500 }}>Добавить фото</div>
-        <div style={{ fontSize: 12, color: theme.textSecondary }}>Нажмите чтобы выбрать или сфотографировать</div>
-      </div>
-      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
-      <input id="camera-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleCameraSelect} style={{ display: 'none' }} capture="environment" />
-      {showOptions && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '90%', maxWidth: 320, textAlign: 'center' }}>
-            <h3 style={{ marginBottom: 20, color: theme.text }}>Выберите источник</h3>
-            <button onClick={() => { fileInputRef.current?.click(); setShowOptions(false); }} style={{ width: '100%', padding: 14, background: theme.primary, border: 'none', borderRadius: 12, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', marginBottom: 12, fontSize: 16 }}>📁 Выбрать из галереи</button>
-            <button onClick={() => { document.getElementById('camera-input')?.click(); setShowOptions(false); }} style={{ width: '100%', padding: 14, background: theme.secondary, border: 'none', borderRadius: 12, color: theme.text, fontWeight: 600, cursor: 'pointer', marginBottom: 12, fontSize: 16 }}>📷 Сделать снимок</button>
-            <button onClick={() => setShowOptions(false)} style={{ width: '100%', padding: 14, background: 'none', border: `1px solid ${theme.secondary}`, borderRadius: 12, color: theme.textSecondary, cursor: 'pointer', fontSize: 16 }}>Отмена</button>
-          </div>
+      <div 
+        onClick={() => fileInputRef.current?.click()}
+        style={drawerStyles.photoPickerZone}
+      >
+        <div style={drawerStyles.pickerCircle}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="1.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
         </div>
-      )}
+        <span style={{ fontSize: '15px', color: '#151414', fontWeight: '600' }}>Выбрать фото</span>
+        <span style={{ fontSize: '12px', color: '#6B6A69' }}>Нажмите, чтобы выбрать файл</span>
+      </div>
+      <input 
+        ref={fileInputRef}
+        type="file" 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              onImageSelected(reader.result as string, file.name.split('.')[0]);
+            };
+            reader.readAsDataURL(file);
+          }
+        }}
+      />
     </>
   );
 };
 
-const WardrobeGrid = ({ clothes, setClothes }: any) => {
-  const [showAdd, setShowAdd] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+const BottomNavBar = ({ currentScreen, onScreenChange }: { currentScreen: string; onScreenChange: (screen: any) => void }) => {
+  const tabs = [
+    { id: 'home', label: 'ГС' },
+    { id: 'profile', label: 'ЛК' },
+  ];
+
+  return (
+    <div style={navStyles.navBarContainer}>
+      <div style={navStyles.navBar}>
+        {tabs.map(tab => {
+          const isActive = currentScreen === tab.id;
+          return (
+            <button 
+              key={tab.id} 
+              onClick={() => onScreenChange(tab.id)} 
+              style={navStyles.navButton}
+            >
+              {tab.id === 'home' && (
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              )}
+              {tab.id === 'ai' && (
+                <span className="fancy-serif" style={{ color: '#FFFFFF', fontSize: '20px' }}>AI</span>
+              )}
+              {tab.id === 'profile' && (
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              )}
+              {isActive && <div style={navStyles.activeIndicator} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const [currentScreen, setCurrentScreen] = useState<'home' | 'ai' | 'profile'>('home');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('top');
   const [newSeason, setNewSeason] = useState('summer');
   const [newColor, setNewColor] = useState('white');
   const [newMaterial, setNewMaterial] = useState('cotton');
   const [newImage, setNewImage] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterColor, setFilterColor] = useState<string | null>(null);
-  const [filterSeason, setFilterSeason] = useState<string | null>(null);
-  const [filterMaterial, setFilterMaterial] = useState<string>('all');
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-  const { haptic, showAlert } = useTelegram();
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const handleImageSelected = (imageDataUrl: string, fileName: string) => {
-    setNewImage(imageDataUrl);
-    setNewName(fileName.slice(0, 20));
-    haptic('light');
-  };
-
-  const saveItem = () => {
-    if (!newName) { showAlert('Введите название вещи'); return; }
-    if (!newImage) { showAlert('Добавьте фото вещи'); return; }
-    
-    const newItem = {
-      id: Date.now(), name: newName, category: newCategory, season: newSeason,
-      color: newColor, material: newMaterial, img: newImage,
-      createdAt: new Date().toISOString(), deletedAt: null,
-    };
-    setClothes([newItem, ...clothes]);
-    setShowAdd(false);
-    setNewName('');
-    setNewImage(null);
-    haptic('medium');
-    showAlert('Вещь добавлена в гардероб!');
-  };
-
-  const deleteItem = (id: number) => {
-    setClothes(clothes.map((c: any) => c.id === id ? { ...c, deletedAt: new Date().toISOString() } : c));
-    haptic('light');
-    showAlert('Вещь перемещена в корзину');
-  };
-
-  let visibleClothes = clothes.filter((i: any) => !i.deletedAt);
-  
-  if (filterCategory !== 'all') visibleClothes = visibleClothes.filter((c: any) => c.category === filterCategory);
-  if (filterSeason) visibleClothes = visibleClothes.filter((c: any) => c.season === filterSeason);
-  if (filterColor) visibleClothes = visibleClothes.filter((c: any) => c.color === filterColor);
-  if (filterMaterial !== 'all') visibleClothes = visibleClothes.filter((c: any) => c.material === filterMaterial);
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase().trim();
-    visibleClothes = visibleClothes.filter((c: any) => c.name.toLowerCase().includes(query));
-  }
-
-  const gridCols = isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)';
-
-  const getCategoryName = (category: string) => {
-    switch(category) {
-      case 'top': return 'Верх';
-      case 'bottom': return 'Низ';
-      case 'shoes': return 'Обувь';
-      case 'accessory': return 'Аксессуар';
-      default: return category;
-    }
-  };
-
-  const getMaterialName = (materialId: string) => {
-    const material = МАТЕРИАЛЫ.find(m => m.id === materialId);
-    return material ? material.name : '';
-  };
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1400 : '100%', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: isDesktop ? 40 : 32, fontWeight: 700, color: theme.primary, margin: 0, fontFamily: "Playfair Display, serif", letterSpacing: "-0.02em" }}>Мой гардероб</h1>
-          <p style={{ color: theme.textSecondary, marginTop: 4, fontSize: 14 }}>{visibleClothes.length} вещей</p>
-        </div>
-        <button onClick={() => setShowSearch(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.primary, padding: 0, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <SmallSearchIcon />
-        </button>
-      </div>
-
-      {showSearch && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 2000, display: 'flex', flexDirection: 'column', padding: isDesktop ? 40 : 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-            <button onClick={() => setShowSearch(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.text }}><CloseIcon /></button>
-            <input type="text" placeholder="Поиск вещей..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} autoFocus style={{ flex: 1, padding: 14, borderRadius: 30, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, fontSize: 16, outline: 'none' }} />
-            {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.textSecondary, fontSize: 14 }}>Очистить</button>}
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {visibleClothes.length === 0 && searchQuery ? (
-              <div style={{ textAlign: 'center', padding: 60, color: theme.textSecondary }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-                <p>Ничего не найдено для "{searchQuery}"</p>
-              </div>
-            ) : searchQuery && (
-              <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 16 }}>
-                {visibleClothes.map((item: any) => (
-                  <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
-                    <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, marginBottom: 8 }} alt="" />
-                    <div style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{item.name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: theme.textSecondary }}>{getCategoryName(item.category)}</span>
-                      <span style={{ fontSize: 10, color: СЕЗОНЫ.find((s: any) => s.id === item.season)?.color }}>{СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}</span>
-                    </div>
-                    <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(229, 115, 115, 0.9)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <FilterPills filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterColor={filterColor} setFilterColor={setFilterColor} filterSeason={filterSeason} setFilterSeason={setFilterSeason} filterMaterial={filterMaterial} setFilterMaterial={setFilterMaterial} theme={theme} isDesktop={isDesktop} />
-
-      {visibleClothes.length === 0 && !searchQuery ? (
-        <div style={{ textAlign: 'center', padding: isDesktop ? 80 : 60, background: theme.card, borderRadius: isDesktop ? 32 : 24, border: `1px solid ${theme.secondary}` }}>
-          <p style={{ color: theme.textSecondary, marginBottom: 24, fontSize: 16 }}>Добавьте первую вещь в гардероб</p>
-          <button onClick={() => setShowAdd(true)} style={{ padding: '14px 32px', background: theme.primary, border: 'none', borderRadius: 30, color: theme.primaryText, cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <PlusIcon /> Добавить вещь
-          </button>
-        </div>
-      ) : visibleClothes.length === 0 && searchQuery ? (
-        <div style={{ textAlign: 'center', padding: 60, color: theme.textSecondary }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}></div>
-          <p>Ничего не найдено для "{searchQuery}"</p>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isDesktop ? 20 : 16 }}>
-            {visibleClothes.map((item: any) => (
-              <div key={item.id} style={{ background: theme.card, borderRadius: 16, padding: 12, position: 'relative', border: `1px solid ${theme.secondary}` }}>
-                <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, marginBottom: 8 }} alt="" />
-                <div style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{item.name}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: theme.textSecondary }}>{getCategoryName(item.category)}</span>
-                  <span style={{ fontSize: 10, color: СЕЗОНЫ.find((s: any) => s.id === item.season)?.color }}>{СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}</span>
-                </div>
-                {item.material && <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>{getMaterialName(item.material)}</div>}
-                <button onClick={() => deleteItem(item.id)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(229, 115, 115, 0.9)', border: 'none', borderRadius: 20, padding: '4px 8px', color: 'white', cursor: 'pointer', fontSize: 12 }}>🗑️</button>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => setShowAdd(true)} style={{ position: 'fixed', bottom: 100, right: isDesktop ? 'calc(50% - 360px)' : 20, width: 56, height: 56, borderRadius: 28, background: theme.primary, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(55, 54, 53, 0.3)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.primaryText }}>
-            <PlusIcon />
-          </button>
-        </>
-      )}
-
-      {showAdd && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: 20 }}>
-          <div style={{ background: theme.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, color: theme.text, fontSize: 24 }}>➕ Новая вещь</h3>
-              <button onClick={() => { setShowAdd(false); setNewImage(null); setNewName(''); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
-            </div>
-
-            {!newImage ? (
-              <PhotoPicker onImageSelected={handleImageSelected} theme={theme} />
-            ) : (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: 16, overflow: 'hidden', marginBottom: 8 }}>
-                  <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(55, 54, 53, 0.8)', border: 'none', borderRadius: 20, padding: '4px 12px', color: 'white', cursor: 'pointer', fontSize: 12 }}>Заменить фото</button>
-                </div>
-              </div>
-            )}
-
-            <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.bg, color: theme.text, marginBottom: 16, boxSizing: 'border-box', fontSize: 16 }} autoFocus />
-            
-            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.bg, color: theme.text, marginBottom: 16, fontSize: 16 }}>
-              <option value="top">Верх</option>
-              <option value="bottom">Низ</option>
-              <option value="shoes">Обувь</option>
-              <option value="accessory">Аксессуар</option>
-            </select>
-            
-            <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.bg, color: theme.text, marginBottom: 16, fontSize: 16 }}>
-              {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-
-            <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.bg, color: theme.text, marginBottom: 16, fontSize: 16 }}>
-              {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-
-            <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.bg, color: theme.text, marginBottom: 24, fontSize: 16 }}>
-              {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={saveItem} style={{ flex: 1, padding: 14, background: theme.primary, border: 'none', borderRadius: 12, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', fontSize: 16 }}>Сохранить</button>
-              <button onClick={() => { setShowAdd(false); setNewImage(null); setNewName(''); }} style={{ flex: 1, padding: 14, background: theme.secondary, border: 'none', borderRadius: 12, color: theme.text, cursor: 'pointer', fontSize: 16 }}>Отмена</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const WearCalendar = ({ history, clothes, setHistory }: any) => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [showSelector, setShowSelector] = useState(false);
-  const theme = getTheme();
-  const isDesktop = useMediaQuery('(min-width: 768px)');
-
-  const getWornItemsForDate = (date: string) => history.filter((h: any) => h.date === date).map((h: any) => h.itemId);
-
-  const toggleWearItem = (itemId: number) => {
-    const wornItems = getWornItemsForDate(selectedDate);
-    if (wornItems.includes(itemId)) {
-      setHistory(history.filter((h: any) => !(h.date === selectedDate && h.itemId === itemId)));
-    } else {
-      setHistory([...history, { date: selectedDate, itemId }]);
-    }
-  };
-
-  const getUniqueDates = () => {
-    const dates = history.map((h: any) => h.date);
-    return [...new Set(dates)].sort().reverse();
-  };
-
-  const getItemStats = (): Record<number, number> => {
-    const stats: Record<number, number> = {};
-    clothes.forEach((item: any) => {
-      if (!item.deletedAt) {
-        const count = history.filter((h: any) => h.itemId === item.id).length;
-        stats[item.id] = count;
-      }
-    });
-    return stats;
-  };
-
-  const getTopItems = () => {
-    const stats = getItemStats();
-    return Object.entries(stats).map(([id, count]) => ({ id: parseInt(id), count: count as number })).sort((a, b) => b.count - a.count).slice(0, 5);
-  };
-
-  const wornItemsOnDate = clothes.filter((item: any) => !item.deletedAt && getWornItemsForDate(selectedDate).includes(item.id));
-  const itemStats = getItemStats();
-  const topItems = getTopItems();
-  const uniqueDates = getUniqueDates();
-  const totalWears = history.length;
-  const uniqueItemsWorn = Object.keys(itemStats).filter(id => itemStats[parseInt(id)] > 0).length;
-
-  const getDayName = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-    return days[date.getDay()];
-  };
-
-  const getCategoryName = (category: string) => {
-    switch(category) {
-      case 'top': return 'Верх';
-      case 'bottom': return 'Низ';
-      case 'shoes': return 'Обувь';
-      case 'accessory': return 'Аксессуар';
-      default: return category;
-    }
-  };
-
-  return (
-    <div style={{ padding: isDesktop ? 40 : 20, paddingBottom: 100, maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto' }}>
-      <div style={{ background: theme.card, borderRadius: isDesktop ? 24 : 20, padding: isDesktop ? 32 : 24, marginBottom: 24, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
-        <h1 style={{ fontSize: isDesktop ? 36 : 28, margin: 0, color: theme.text }}>Календарь носки</h1>
-        <p style={{ color: theme.textSecondary, marginTop: 8 }}>Отслеживайте как часто носите вещи</p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{totalWears}</div>
-          <div style={{ fontSize: 12, color: theme.textSecondary }}>всего отметок</div>
-        </div>
-        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{uniqueItemsWorn}</div>
-          <div style={{ fontSize: 12, color: theme.textSecondary }}>вещей в ротации</div>
-        </div>
-        <div style={{ background: theme.card, borderRadius: 16, padding: 16, textAlign: 'center', border: `1px solid ${theme.secondary}` }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: theme.primary }}>{uniqueDates.length}</div>
-          <div style={{ fontSize: 12, color: theme.textSecondary }}>дней с отметками</div>
-        </div>
-      </div>
-
-      {topItems.length > 0 && (
-        <div style={{ background: theme.card, borderRadius: 16, padding: 20, marginBottom: 24, border: `1px solid ${theme.secondary}` }}>
-          <h3 style={{ marginBottom: 16, color: theme.text }}>Чаще всего носите</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {topItems.map((item, index) => {
-              const foundItem = clothes.find((c: any) => c.id === item.id);
-              if (!foundItem) return null;
-              return (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 32, fontSize: 20, fontWeight: 700, color: theme.primary }}>#{index + 1}</div>
-                  <img src={foundItem.img} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} alt="" />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, color: theme.text }}>{foundItem.name}</div>
-                    <div style={{ fontSize: 11, color: theme.textSecondary }}>{getCategoryName(foundItem.category)}</div>
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: theme.primary }}>{item.count}</div>
-                  <div style={{ fontSize: 12, color: theme.textSecondary }}>раз</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginBottom: 24 }}>
-        <label style={{ display: 'block', marginBottom: 8, color: theme.textSecondary }}>Выберите дату</label>
-        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1px solid ${theme.secondary}`, background: theme.card, color: theme.text, fontSize: 16, cursor: 'pointer' }} />
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0, color: theme.text }}>{getDayName(selectedDate)}, {selectedDate.split('-').reverse().join('.')}</h3>
-          <button onClick={() => setShowSelector(true)} style={{ padding: '10px 20px', background: theme.primary, border: 'none', borderRadius: 25, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>+ Отметить</button>
-        </div>
-
-        {wornItemsOnDate.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, background: theme.card, borderRadius: 16, border: `1px solid ${theme.secondary}` }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>👔</div>
-            <p style={{ color: theme.textSecondary }}>Ничего не отмечено на этот день</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(2, 1fr)' : '1fr', gap: 12 }}>
-            {wornItemsOnDate.map((item: any) => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: theme.card, padding: 12, borderRadius: 12, border: `1px solid ${theme.secondary}` }}>
-                <img src={item.img} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} alt="" />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 500, color: theme.text }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: theme.textSecondary }}>{СЕЗОНЫ.find((s: any) => s.id === item.season)?.name}</div>
-                </div>
-                <button onClick={() => toggleWearItem(item.id)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: theme.textSecondary }}>❌</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showSelector && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ background: theme.card, width: '100%', maxHeight: '80vh', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, color: theme.text }}>Отметить вещи на {selectedDate}</h3>
-              <button onClick={() => setShowSelector(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: theme.text }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12 }}>
-              {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
-                const isWorn = getWornItemsForDate(selectedDate).includes(item.id);
-                return (
-                  <div key={item.id} onClick={() => toggleWearItem(item.id)} style={{ background: theme.bg, padding: 12, borderRadius: 12, textAlign: 'center', cursor: 'pointer', border: isWorn ? `2px solid ${theme.primary}` : `1px solid ${theme.secondary}`, opacity: isWorn ? 1 : 0.7 }}>
-                    <img src={item.img} style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, objectFit: 'cover', marginBottom: 8 }} alt="" />
-                    <div style={{ fontSize: 12, fontWeight: 500, color: theme.text }}>{item.name}</div>
-                    <div style={{ fontSize: 10, color: theme.textSecondary, marginTop: 4 }}>{itemStats[item.id] || 0} раз всего</div>
-                    {isWorn && <div style={{ marginTop: 4, fontSize: 11, color: theme.primary, fontWeight: 600 }}>Отмечено</div>}
-                  </div>
-                );
-              })}
-            </div>
-            <button onClick={() => setShowSelector(false)} style={{ width: '100%', padding: 14, background: theme.primary, border: 'none', borderRadius: 12, color: theme.primaryText, fontWeight: 600, cursor: 'pointer', marginTop: 20 }}>Готово</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-function App() {
-  const [currentScreen, setCurrentScreen] = useState<'wardrobe' | 'capsules' | 'calendar' | 'outfits' | 'basket'>('wardrobe');
-  const [onboardingComplete, setOnboardingComplete] = useLocalStorage('onboardingComplete', false);
   const [clothes, setClothes] = useLocalStorage<any[]>('clothes', []);
-  const [capsules, setCapsules] = useLocalStorage<any[]>('capsules', []);
-  const [outfits, setOutfits] = useLocalStorage<any[]>('outfits', []);
-  const [history, setHistory] = useLocalStorage<any[]>('history', []);
+  const [outfits] = useLocalStorage<any[]>('outfits', []);
+  const [chatInput, setChatInput] = useState('');
 
-  // autocleaner after 2 weeks
-  useAutoCleanup(clothes, setClothes);
+  const { haptic } = useTelegram();
 
   useEffect(() => {
-    const theme = getTheme();
-    document.body.style.backgroundColor = theme.bg;
-    document.body.style.color = theme.text;
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+      
+      body, button, input, select, textarea, span, div {
+        font-family: 'Inter', sans-serif !important;
+      }
+      
+      .fancy-serif {
+        font-family: 'Playfair Display', serif !important;
+        font-style: normal !important;
+        font-weight: 400 !important;
+        letter-spacing: 0.5px !important;
+        text-transform: uppercase;
+      }
+
+      h1.fancy-serif {
+        letter-spacing: 1.5px !important;
+      }
+
+      [style*="dayNumber"], [style*="calendarDaysHeader"] span {
+        font-family: 'Inter', sans-serif !important;
+        font-style: normal !important;
+        letter-spacing: normal !important;
+        font-weight: 500 !important;
+      }
+    `;
+    document.head.appendChild(styleTag);
+
+    document.body.style.backgroundColor = '#edecea';
+    document.body.style.color = '#151414';
+    if (document.documentElement) {
+      document.documentElement.style.backgroundColor = '#edecea';
+    }
+
+    return () => {
+      if (document.head.contains(styleTag)) {
+        document.head.removeChild(styleTag);
+      }
+    };
   }, []);
 
-  const basketCount = clothes.filter((c: any) => c.deletedAt).length;
-
-  if (!onboardingComplete) return <OnboardingSlider onComplete={() => setOnboardingComplete(true)} />;
-
   return (
-    <div style={{ minHeight: '100vh', background: getTheme().bg, paddingBottom: 80 }}>
-      {currentScreen === 'wardrobe' && <WardrobeGrid clothes={clothes} setClothes={setClothes} />}
-      {currentScreen === 'outfits' && <OutfitsPage clothes={clothes} outfits={outfits} setOutfits={setOutfits} />}
-      {currentScreen === 'capsules' && <CapsulesPage capsules={capsules} setCapsules={setCapsules} clothes={clothes} />}
-      {currentScreen === 'basket' && <BasketPage clothes={clothes} setClothes={setClothes} />}
-      {currentScreen === 'calendar' && <WearCalendar history={history} clothes={clothes} setHistory={setHistory} />}
-      <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} basketCount={basketCount} />
+    <div style={{ minHeight: '100vh', backgroundColor: '#edecea', position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+      
+      {currentScreen === 'home' && (
+        <div style={pageStyle}>
+          
+          <div style={headerStyles.headerContainer}>
+            <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6L15 30L26 6" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20 20C23.5 18 29.5 18 31.5 21.5C33 24 29 26.5 25 26.5C21 26.5 19 29.5 20.5 32C22.5 35 29.5 35 32 32.5" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            
+            <h1 style={headerStyles.headerTitle} className="fancy-serif">ГЛАВНАЯ</h1>
+            
+            <button 
+              onClick={() => {
+                const query = prompt("Поиск вещей:", searchQuery);
+                if (query !== null) setSearchQuery(query);
+              }}
+              style={headerStyles.searchBtn}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="12" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div style={outfitStyles.sectionContainer}>
+            <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Аутфит сегодня</h2>
+            
+            <div style={outfitStyles.mainRow}>
+              <div style={outfitStyles.outfitCard}>
+                {outfits.length > 0 ? (
+                  (() => {
+                    const latestOutfit = outfits[outfits.length - 1];
+                    return (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <span style={outfitStyles.outfitName}>{latestOutfit.name}</span>
+                        <div style={outfitStyles.itemsGrid}>
+                          {latestOutfit.items.slice(0, 4).map((item: any, idx: number) => (
+                            <img key={item.id || idx} src={item.img} alt="" style={outfitStyles.gridImage} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <span style={outfitStyles.outfitName}>Название</span>
+                    <div style={outfitStyles.emptyGrid}>
+                      <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
+                        Нет образов
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={widgetStyles.weatherCard}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={widgetStyles.weatherCity}>Санкт-Петербург</div>
+                    <div style={widgetStyles.weatherTemp}>+17°</div>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: '500' }}>Ясно</span>
+                </div>
+                
+                <div style={widgetStyles.hourlyRow}>
+                  <div style={widgetStyles.hourItem}><div>4:00</div><div style={{ fontWeight: '600' }}>+18°</div></div>
+                  <div style={widgetStyles.hourItem}><div>5:00</div><div style={{ fontWeight: '600' }}>+19°</div></div>
+                  <div style={widgetStyles.hourItem}><div>6:00</div><div style={{ fontWeight: '600' }}>+20°</div></div>
+                  <div style={widgetStyles.hourItem}><div>7:00</div><div style={{ fontWeight: '600' }}>+20°</div></div>
+                </div>
+              </div>
+
+              <div style={widgetStyles.calendarCard}>
+                <div style={widgetStyles.calendarDaysHeader}>
+                  <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+                </div>
+                <div style={widgetStyles.calendarGrid}>
+                  {[
+                    1, 2, 3, 4, 5, 6, 7,
+                    8, 9, 10, 11, 12, 13, 14,
+                    15, 16, 17, 18, 19, 20, 21,
+                    22, 23, 24, 25, 26, 27, 28,
+                    29, 30
+                  ].map((day) => (
+                    <div key={day} style={widgetStyles.dayCell}>
+                      <span style={widgetStyles.dayNumber}>{day}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={homeStyles.buttonContainer}>
+            <button 
+              style={homeStyles.addBtn} 
+              onClick={() => {
+                setIsDrawerOpen(true);
+                haptic('light');
+              }}
+            >
+              <div style={homeStyles.plusCircle}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="1" strokeLinecap="round">
+                  <line x1="12" y1="4" x2="12" y2="20"></line>
+                  <line x1="4" y1="12" x2="20" y2="12"></line>
+                </svg>
+              </div>
+              <span style={homeStyles.btnText} className="fancy-serif">ДОБАВИТЬ ВЕЩЬ</span>
+            </button>
+          </div>
+
+          {isDrawerOpen && (
+            <div onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.backdrop} />
+          )}
+
+          <div style={{ ...drawerStyles.drawer, display: isDrawerOpen ? 'flex' : 'none' }}>
+            <div style={drawerStyles.header}>
+              <div style={drawerStyles.headerLeft}>
+                <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>+</span>
+                <h3 style={drawerStyles.headerTitle}>Новая вещь</h3>
+              </div>
+              <button onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.closeBtn}>✕</button>
+            </div>
+
+            <div style={drawerStyles.scrollContainer}>
+              {!newImage ? (
+                <PhotoPicker onImageSelected={(imgData: string, fileName: string) => {
+                  setNewImage(imgData);
+                  if (!newName) setNewName(fileName.slice(0, 20));
+                }} />
+              ) : (
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: '20px', overflow: 'hidden' }}>
+                  <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(21, 20, 20, 0.8)', color: '#FFFFFF', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Заменить фото</button>
+                </div>
+              )}
+
+              <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
+
+              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
+                <option value="top">Верх</option>
+                <option value="bottom">Низ</option>
+                <option value="shoes">Обувь</option>
+                <option value="accessory">Аксессуары</option>
+              </select>
+
+              <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
+                {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+
+              <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={drawerStyles.select}>
+                {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
+                {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+
+              <div style={drawerStyles.actionsContainer}>
+                <button 
+                  onClick={() => {
+                    if (!newName.trim()) { alert('Введите название вещи'); return; }
+                    if (!newImage) { alert('Добавить фото вещи'); return; }
+                    
+                    const newItem = {
+                      id: Date.now(),
+                      name: newName,
+                      category: newCategory,
+                      season: newSeason,
+                      color: newColor,
+                      material: newMaterial,
+                      img: newImage,
+                      createdAt: new Date().toISOString(),
+                      deletedAt: null,
+                    };
+
+                    setClothes([newItem, ...clothes]);
+                    setIsDrawerOpen(false);
+                    setNewName('');
+                    setNewImage(null);
+                    haptic('medium');
+                  }} 
+                  style={drawerStyles.saveBtn}
+                >
+                  Сохранить
+                </button>
+                <button onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.cancelBtn}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {currentScreen === 'profile' && (
+        <div style={pageStyle}>
+          
+          <div style={headerStyles.headerContainer}>
+            <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6L15 30L26 6" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20 20C23.5 18 29.5 18 31.5 21.5C33 24 29 26.5 25 26.5C21 26.5 19 29.5 20.5 32C22.5 35 29.5 35 32 32.5" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            
+            <h1 style={headerStyles.headerTitle} className="fancy-serif">ПРОФИЛЬ</h1>
+            
+            <button 
+              onClick={() => {
+                const query = prompt("Поиск по вещам в профиле:", searchQuery);
+                if (query !== null) setSearchQuery(query);
+              }}
+              style={headerStyles.searchBtn}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="12" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </div>
+
+          <ProfileGallery 
+            clothes={clothes} 
+            outfits={outfits} 
+            searchQuery={searchQuery}
+            haptic={haptic}
+          />
+
+        </div>
+      )}
+
+      <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
     </div>
   );
 }
 
-export default App;
+const pageStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: '100vh',
+  padding: '16px 16px 120px 16px',
+  boxSizing: 'border-box',
+};
 
+const navStyles: Record<string, React.CSSProperties> = {
+  navBarContainer: {
+    position: 'fixed',
+    bottom: '24px',
+    left: '0',
+    right: '0',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    pointerEvents: 'none',
+  },
+  navBar: {
+    display: 'flex',
+    backgroundColor: '#151414',
+    borderRadius: '24px', 
+    padding: '12px 40px',
+    alignItems: 'center',
+    boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.3)',
+    pointerEvents: 'auto',
+    width: '85%',
+    maxWidth: '340px',
+    justifyContent: 'space-between',
+    boxSizing: 'border-box',
+  },
+  navButton: {
+    background: 'none',
+    border: 'none',
+    outline: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    padding: '4px 0',
+    width: '44px',
+    height: '44px',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: '-2px',
+    width: '20px',
+    height: '2px',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '1px',
+  },
+};
+
+const drawerStyles: Record<string, React.CSSProperties> = {
+  backdrop: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    zIndex: 998,
+  },
+  drawer: {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '90%',
+    maxWidth: '360px',
+    maxHeight: '85vh',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '28px',
+    boxShadow: '0px 12px 40px rgba(0, 0, 0, 0.15)',
+    zIndex: 999,
+    display: 'flex',
+    flexDirection: 'column',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px 12px 24px',
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: '22px',
+    fontWeight: '700',
+    color: '#333231',
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '22px',
+    color: '#151414',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContainer: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 24px 24px 24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+  },
+  photoPickerZone: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '32px 24px',
+    backgroundColor: '#E6E5E3',
+    borderRadius: '20px',
+    border: '1.5px dashed #D4D3D1',
+    gap: '12px',
+    cursor: 'pointer',
+  },
+  pickerCircle: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    backgroundColor: '#FFFFFF',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  input: {
+    width: '100%',
+    padding: '14px 18px',
+    borderRadius: '14px',
+    border: 'none',
+    backgroundColor: '#E6E5E3',
+    color: '#151414',
+    fontSize: '16px',
+    boxSizing: 'border-box',
+    outline: 'none',
+  },
+  select: {
+    width: '100%',
+    padding: '14px 18px',
+    borderRadius: '14px',
+    border: 'none',
+    backgroundColor: '#E6E5E3',
+    color: '#151414',
+    fontSize: '16px',
+    boxSizing: 'border-box',
+    outline: 'none',
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23151414' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 18px center',
+    backgroundSize: '16px',
+  },
+  actionsContainer: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '8px',
+  },
+  saveBtn: {
+    flex: 1,
+    padding: '16px',
+    backgroundColor: '#323130',
+    color: '#FFFFFF',
+    border: 'none',
+    borderRadius: '16px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: '16px',
+    backgroundColor: '#D4D3D1',
+    color: '#151414',
+    border: 'none',
+    borderRadius: '16px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+};
+
+const headerStyles: Record<string, React.CSSProperties> = {
+  headerContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: '8px 4px 16px 4px',
+    boxSizing: 'border-box',
+    backgroundColor: 'transparent',
+  },
+  logoZone: {
+    position: 'relative',
+    width: '40px',
+    height: '40px',
+    userSelect: 'none',
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: '22px',
+    fontWeight: '600',
+    color: '#151414',
+    textAlign: 'center',
+  },
+  searchBtn: {
+    width: '42px',
+    height: '42px',
+    borderRadius: '50%',
+    backgroundColor: '#151414',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+  },
+};
+
+const outfitStyles: Record<string, React.CSSProperties> = {
+  sectionContainer: {
+    width: '100%',
+    marginTop: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    boxSizing: 'border-box',
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#151414',
+  },
+  mainRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr', 
+    gridTemplateRows: '140px 170px', 
+    gap: '12px', 
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  outfitCard: {
+    gridRow: '1 / span 2', 
+    backgroundColor: '#FFFFFF',
+    borderRadius: '24px',
+    padding: '16px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+  },
+  outfitName: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#6B6A69',
+    marginBottom: '12px',
+    display: 'block',
+  },
+  itemsGrid: {
+    flex: 1,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '8px',
+    alignItems: 'center',
+  },
+  emptyGrid: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px dashed #D4D3D1',
+  },
+  gridImage: {
+    width: '100%',
+    aspectRatio: '1/1',
+    objectFit: 'cover',
+    borderRadius: '12px',
+    backgroundColor: '#E6E5E3',
+  },
+};
+
+const homeStyles: Record<string, React.CSSProperties> = {
+  buttonContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: '85px',
+    boxSizing: 'border-box',
+  },
+  addBtn: {
+    background: 'none',
+    border: 'none',
+    outline: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '16px', 
+    padding: '20px',
+  },
+  plusCircle: {
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+    border: '2px solid #151414', 
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    transition: 'transform 0.2s ease',
+  },
+  btnText: {
+    color: '#151414',
+    fontSize: '16px',
+    fontWeight: '600',
+  },
+};
+
+const widgetStyles: Record<string, React.CSSProperties> = {
+  weatherCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '20px',
+    padding: '12px 14px',
+    color: '#151414',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    boxSizing: 'border-box',
+    height: '100%',
+    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+  },
+  hourlyRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+    borderTop: '0.5px solid rgba(21, 20, 20, 0.12)',
+    paddingTop: '8px',
+  },
+  weatherCity: {
+    fontSize: '12px',
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  weatherTemp: {
+    fontSize: '32px',
+    fontWeight: '700',
+    margin: '6px 0',
+  },
+  hourItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    fontSize: '9px',
+    gap: '1px',
+  },
+  calendarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '20px',
+    padding: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    boxSizing: 'border-box',
+    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+    height: '100%',
+    justifyContent: 'space-between',
+  },
+  calendarDaysHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '8px',
+    fontWeight: '700',
+    color: '#A8A7A5',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)', 
+    rowGap: '4px', 
+    columnGap: '2px',
+  },
+  dayCell: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '16px',
+    boxSizing: 'border-box',
+  },
+  dayNumber: {
+    fontSize: '10px',
+    fontWeight: '500',
+    color: '#151414',
+  },
+};
+
+const chatStyles: Record<string, React.CSSProperties> = {
+  chatContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: 'calc(100vh - 210px)',
+    width: '100%',
+    boxSizing: 'border-box',
+    position: 'relative',
+  },
+  messagesList: {
+    flex: 1,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    padding: '4px 4px 16px 4px',
+  },
+  messageRow: {
+    display: 'flex',
+    width: '100%',
+  },
+  bubble: {
+    maxWidth: '80%',
+    padding: '14px 18px',
+    fontSize: '15px',
+    lineHeight: '1.4',
+    boxSizing: 'border-box',
+  },
+  inputZone: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: 'transparent',
+    paddingTop: '10px',
+  },
+  chatInput: {
+    flex: 1,
+    padding: '16px 20px',
+    borderRadius: '30px',
+    border: 'none',
+    backgroundColor: '#FFFFFF',
+    color: '#151414',
+    fontSize: '15px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+  },
+  sendBtn: {
+    width: '50px',
+    height: '50px',
+    borderRadius: '50%',
+    backgroundColor: '#151414',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+    flexShrink: 0,
+  },
+};
+
+const ProfileGallery = ({ clothes, outfits, searchQuery, haptic }: any) => {
+  const [activeTab, setActiveTab] = useState<'capsules' | 'outfits' | 'clothes'>('clothes');
+
+  const filteredClothes = clothes.filter((item: any) => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const filteredOutfits = outfits.filter((item: any) => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div style={{ width: '100%', marginTop: '10px' }}>
+      
+      <div style={galleryStyles.tabsContainer}>
+        {[
+          { id: 'capsules', label: 'Капсулы' },
+          { id: 'outfits', label: 'Аутфиты' },
+          { id: 'clothes', label: 'Одежда' },
+        ].map((tab) => {
+          const isSelected = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                haptic('light');
+              }}
+              style={{
+                ...galleryStyles.tabButton,
+                color: isSelected ? '#151414' : '#8B8A89',
+                borderBottom: isSelected ? '2px solid #151414' : '2px solid transparent',
+                fontWeight: isSelected ? '600' : '400',
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={galleryStyles.grid} className="profile-grid">
+        
+        {activeTab === 'capsules' && (
+          <div style={galleryStyles.emptyState}>У вас пока нет созданных капсул</div>
+        )}
+
+        {activeTab === 'outfits' && (
+          filteredOutfits.length > 0 ? (
+            filteredOutfits.map((outfit: any) => (
+              <div key={outfit.id} style={galleryStyles.card}>
+                <div style={galleryStyles.outfitPreviewGrid}>
+                  {outfit.items.slice(0, 4).map((item: any, idx: number) => (
+                    <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
+                  ))}
+                </div>
+                <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+              </div>
+            ))
+          ) : (
+            <div style={galleryStyles.emptyState}>Нет сохраненных образов</div>
+          )
+        )}
+
+        {activeTab === 'clothes' && (
+          filteredClothes.length > 0 ? (
+            filteredClothes.map((item: any) => (
+              <div key={item.id} style={galleryStyles.card}>
+                <div style={galleryStyles.imageWrapper}>
+                  <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                </div>
+                <span style={galleryStyles.cardTitle}>{item.name}</span>
+              </div>
+            ))
+          ) : (
+            <div style={galleryStyles.emptyState}>Гардероб пуст. Добавьте вещи на главном экране</div>
+          )
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+const galleryStyles: Record<string, React.CSSProperties> = {
+  tabsContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    borderBottom: '1px solid rgba(21, 20, 20, 0.08)',
+    paddingBottom: '4px',
+    marginBottom: '20px',
+  },
+  tabButton: {
+    background: 'none',
+    border: 'none',
+    outline: 'none',
+    padding: '10px 12px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    fontFamily: 'Inter, sans-serif',
+    transition: 'all 0.2s ease',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)', 
+    gap: '10px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '14px',
+    padding: '6px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.02)',
+    boxSizing: 'border-box',
+  },
+  imageWrapper: {
+    width: '100%',
+    aspectRatio: '1/1',
+    borderRadius: '10px',
+    overflow: 'hidden',
+    backgroundColor: '#E6E5E3',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  cardTitle: {
+    fontSize: '11px',
+    fontWeight: '500',
+    color: '#151414',
+    paddingLeft: '2px',
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+  },
+  outfitPreviewGrid: {
+    width: '100%',
+    aspectRatio: '1/1',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '3px',
+    backgroundColor: '#E6E5E3',
+    borderRadius: '10px',
+    padding: '3px',
+    boxSizing: 'border-box',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    borderRadius: '6px',
+  },
+  emptyState: {
+    gridColumn: '1 / -1', 
+    textAlign: 'center',
+    padding: '40px 20px',
+    color: '#6B6A69',
+    fontSize: '14px',
+  },
+};
+
+export default App;
 export { getTheme, СЕЗОНЫ, ЦВЕТА, МАТЕРИАЛЫ, КАТЕГОРИИ, useMediaQuery, useTelegram };

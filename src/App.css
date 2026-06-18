@@ -1,3 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+body, button, input, select, textarea {
+  font-family: 'Inter', sans-serif !important;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
@@ -180,5 +186,12 @@
   &::after {
     right: 0;
     border-right-color: var(--border);
+  }
+}
+
+@media (min-width: 768px) {
+  .profile-grid {
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 12px !important;
   }
 }
