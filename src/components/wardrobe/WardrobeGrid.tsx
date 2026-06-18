@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSubscription } from '/Users/veronikadrozd/my-telegram-app/src/hooks/useSubscription';
+import { useSubscription } from '../../hooks/useSubscription';
 import { SubscriptionModal } from '../SubscriptionModal';
 
 interface ClothesItem {
