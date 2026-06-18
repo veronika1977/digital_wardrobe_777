@@ -308,19 +308,6 @@ function App() {
             </div>
             
             <h1 style={headerStyles.headerTitle} className="fancy-serif">ГЛАВНАЯ</h1>
-            
-            <button 
-              onClick={() => {
-                setIsSearchOpen(true);
-                haptic('light');
-              }}
-              style={headerStyles.searchBtn}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="12" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </button>
           </div>
 
           <div style={outfitStyles.sectionContainer}>
@@ -432,7 +419,7 @@ function App() {
               />
             </div>
             
-            <h1 style={headerStyles.headerTitle} className="fancy-serif">ГАРДЕРОБ</h1>
+            <h1 style={{ ...headerStyles.headerTitle, marginLeft: '40px' }} className="fancy-serif">ГАРДЕРОБ</h1>
             
             <button 
               onClick={() => {
@@ -475,7 +462,7 @@ function App() {
                 style={{ width: '60px', height: '60px', objectFit: 'contain' }} 
               />
             </div>
-            <h1 style={headerStyles.headerTitle} className="fancy-serif">КОРЗИНА</h1>
+            <h1 style={{ ...headerStyles.headerTitle, marginLeft: '40px' }} className="fancy-serif">КОРЗИНА</h1>
             <div style={{ width: '42px', height: '42px' }} />
           </div>
 
@@ -1150,7 +1137,7 @@ const ProfileGallery = ({
             ))
           ) : (
             <div style={galleryStyles.emptyState}>
-              {searchQuery.trim() !== '' ? 'Ничего не найдено по этому запросу' : 'Гардероб пуст. Добавьте вещи на главном экране'}
+              {searchQuery.trim() !== '' ? 'Ничего не найдено по этому запросу' : 'Гардероб пуст. Сначала добавьте вещи'}
             </div>
           )
         )}
@@ -1393,18 +1380,20 @@ const headerStyles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
     backgroundColor: 'transparent',
   },
-  logoZone: {
-    position: 'relative',
-    width: '40px',
-    height: '40px',
-    userSelect: 'none',
-  },
   headerTitle: {
     margin: 0,
     fontSize: '22px',
     fontWeight: '600',
     color: '#151414',
     textAlign: 'center',
+    flex: 1,
+    marginRight: '35px',
+  },
+  logoZone: {
+    position: 'relative',
+    width: '40px',
+    height: '40px',
+    userSelect: 'none',
   },
   searchBtn: {
     width: '42px',
