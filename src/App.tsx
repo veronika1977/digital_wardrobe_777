@@ -133,7 +133,7 @@ const PhotoPicker = ({ onImageSelected }: any) => {
           if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-              onImageSelected(reader.result as string, file.name.split('.')[0]);
+              onImageSelected(reader.result as string);
             };
             reader.readAsDataURL(file);
           }
@@ -190,15 +190,15 @@ const BottomNavBar = ({ currentScreen, onScreenChange }: { currentScreen: string
 function App() {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'profile' | 'cart'>('home');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  
+  const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
   const [newName, setNewName] = useState('');
-  const [newCategory, setNewCategory] = useState('top');
-  const [newSeason, setNewSeason] = useState('summer');
-  const [newColor, setNewColor] = useState('white');
-  const [newMaterial, setNewMaterial] = useState('cotton');
+  const [newCategory, setNewCategory] = useState('');
+  const [newSeason, setNewSeason] = useState('');
+  const [newColor, setNewColor] = useState('');
+  const [newMaterial, setNewMaterial] = useState('');
   const [newImage, setNewImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [drawerError, setDrawerError] = useState<string | null>(null);
   const [clothes, setClothes] = useLocalStorage<any[]>('clothes', []);
   const [outfits, setOutfits] = useLocalStorage<any[]>('outfits', []); 
   const [capsules, setCapsules] = useLocalStorage<any[]>('capsules', []); 
@@ -208,6 +208,37 @@ function App() {
   const { haptic } = useTelegram();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [outfitName, setOutfitName] = useState('');
+
+  // Функция для генерации дней текущего месяца
+  const getCalendarDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    let startDayOfWeek = firstDayOfMonth.getDay();
+    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push({ day: null, isToday: false });
+    }
+
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isToday =
+        day === today.getDate() &&
+        month === today.getMonth() &&
+        year === today.getFullYear();
+      
+      days.push({ day, isToday });
+    }
+    return days;
+  };
+
+  const calendarDays = getCalendarDays();
   
   const toggleItemSelection = (item: any) => {
     if (selectedItems.find((i: any) => i.id === item.id)) {
@@ -345,15 +376,23 @@ function App() {
                   <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
                 </div>
                 <div style={widgetStyles.calendarGrid}>
-                  {[
-                    1, 2, 3, 4, 5, 6, 7,
-                    8, 9, 10, 11, 12, 13, 14,
-                    15, 16, 17, 18, 19, 20, 21,
-                    22, 23, 24, 25, 26, 27, 28,
-                    29, 30
-                  ].map((day) => (
-                    <div key={day} style={widgetStyles.dayCell}>
-                      <span style={widgetStyles.dayNumber}>{day}</span>
+                  {calendarDays.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      style={{
+                        ...widgetStyles.dayCell,
+                        backgroundColor: item.isToday ? '#151414' : 'transparent',
+                        borderRadius: item.isToday ? '50%' : '0',
+                      }}
+                    >
+                      <span 
+                        style={{
+                          ...widgetStyles.dayNumber,
+                          color: item.isToday ? '#FFFFFF' : item.day ? '#151414' : 'transparent'
+                        }}
+                      >
+                        {item.day}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -416,22 +455,14 @@ function App() {
             capsules={capsules}
             setCapsules={setCapsules}
             searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
             setIsSearchOpen={setIsSearchOpen}
             haptic={haptic}
-            selectedItems={selectedItems}
-            setSelectedItems={setSelectedItems}
-            isOutfitCreatorOpen={isOutfitCreatorOpen}
             setIsOutfitCreatorOpen={setIsOutfitCreatorOpen}
-            outfitName={outfitName}
-            setOutfitName={setOutfitName}
-            toggleItemSelection={toggleItemSelection}
             setIsDrawerOpen={setIsDrawerOpen}
+            onItemClick={setSelectedItemForView} 
           />
-
         </div>
       )}
-
 
       {currentScreen === 'cart' && (
         <div style={pageStyle}>
@@ -481,44 +512,67 @@ function App() {
             }
 
             return (
-              <div style={galleryStyles.grid} className="profile-grid">
-                {deletedClothes.map((item: any) => (
-                  <div key={item.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                    <button 
-                      onClick={() => restoreItem(item.id, 'clothes')}
-                      style={cartPageStyles.restoreBtn}
-                      title="Восстановить"
-                    >
-                      ↩
-                    </button>
-                    <div style={galleryStyles.imageWrapper}>
-                      <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
-                    </div>
-                    <span style={galleryStyles.cardTitle}>{item.name}</span>
-                  </div>
-                ))}
-
-                {deletedOutfits.map((outfit: any) => (
-                  <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                    <button 
-                      onClick={() => restoreItem(outfit.id, 'outfits')}
-                      style={cartPageStyles.restoreBtn}
-                      title="Восстановить"
-                    >
-                      ↩
-                    </button>
-                    <div style={outfitStyles.outfitCard}>
-                      {outfit.items.slice(0, 4).map((item: any, idx: number) => (
-                        <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* СЕТКА ДЛЯ УДАЛЕННЫХ АУТФИТОВ */}
+                {deletedOutfits.length > 0 && (
+                  <div>
+                    <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные аутфиты</span>
+                    <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
+                      {deletedOutfits.map((outfit: any) => (
+                        <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                          <button 
+                            onClick={() => restoreItem(outfit.id, 'outfits')}
+                            style={cartPageStyles.restoreBtn}
+                            title="Восстановить"
+                          >
+                            ↩
+                          </button>
+                          <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
+                            <div style={outfitStyles.itemsGrid}>
+                              {outfit.items.slice(0, 4).map((item: any, idx: number) => (
+                                <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
+                              ))}
+                            </div>
+                          </div>
+                          <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                        </div>
                       ))}
                     </div>
-                    <span style={galleryStyles.cardTitle}>{outfit.name}</span>
                   </div>
-                ))}
+                )}
+
+                {/* СЕТКА ДЛЯ УДАЛЕННОЙ ОДЕЖДЫ */}
+                {deletedClothes.length > 0 && (
+                  <div>
+                    <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленная одежда</span>
+                    <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
+                      {deletedClothes.map((item: any) => (
+                        <div 
+                          key={item.id} 
+                          onClick={() => setSelectedItemForView(item)} 
+                          style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
+                        >
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              restoreItem(item.id, 'clothes');
+                            }}
+                            style={cartPageStyles.restoreBtn}
+                          >
+                            ↩
+                          </button>
+                          <div style={galleryStyles.imageWrapper}>
+                            <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                          </div>
+                          <span style={galleryStyles.cardTitle}>{item.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
-
         </div>
       )}
       
@@ -620,7 +674,7 @@ function App() {
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', paddingBottom: '16px' }}>
                 {clothes
-                  .filter((item: WardrobeItem) => selectedCategory === 'all' || item.category === selectedCategory)
+                  .filter((item: WardrobeItem) => !item.deletedAt && (selectedCategory === 'all' || item.category === selectedCategory))
                   .map((item: WardrobeItem) => (
                     <div 
                       key={item.id} 
@@ -710,9 +764,19 @@ function App() {
         </div>
       )}
 
-
       {isDrawerOpen && (
-        <div onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.backdrop} />
+        <div 
+          onClick={() => { 
+            setIsDrawerOpen(false); 
+            setNewName(''); 
+            setNewImage(null); 
+            setNewCategory('');
+            setNewSeason('');
+            setNewColor('');
+            setNewMaterial('');
+          }} 
+          style={drawerStyles.backdrop} 
+        />
       )}
 
       <div style={{ ...drawerStyles.drawer, display: isDrawerOpen ? 'flex' : 'none' }}>
@@ -721,14 +785,26 @@ function App() {
             <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>+</span>
             <h3 style={drawerStyles.headerTitle}>Новая вещь</h3>
           </div>
-          <button onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.closeBtn}>✕</button>
+          <button 
+            onClick={() => { 
+              setIsDrawerOpen(false); 
+              setNewName(''); 
+              setNewImage(null); 
+              setNewCategory('');
+              setNewSeason('');
+              setNewColor('');
+              setNewMaterial('');
+            }} 
+            style={drawerStyles.closeBtn}
+          >
+            ✕
+          </button>
         </div>
 
         <div style={drawerStyles.scrollContainer}>
           {!newImage ? (
-            <PhotoPicker onImageSelected={(imgData: string, fileName: string) => {
+            <PhotoPicker onImageSelected={(imgData: string) => {
               setNewImage(imgData);
-              if (!newName) setNewName(fileName.slice(0, 20));
             }} />
           ) : (
             <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: '20px', overflow: 'hidden' }}>
@@ -740,6 +816,7 @@ function App() {
           <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
 
           <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
+            <option value="" disabled selected hidden>Категория</option>
             <option value="top">Верх</option>
             <option value="bottom">Низ</option>
             <option value="shoes">Обувь</option>
@@ -747,22 +824,48 @@ function App() {
           </select>
 
           <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
+            <option value="" disabled selected hidden>Сезон</option>
             {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
           <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={drawerStyles.select}>
+            <option value="" disabled selected hidden>Цвет</option>
             {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
           <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
+            <option value="" disabled selected hidden>Материал</option>
             {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
+          
+          {drawerError && (
+            <div style={{
+              backgroundColor: '#FFF0F0',
+              border: '1px solid #E57373',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              color: '#E57373',
+              fontSize: '13px',
+              fontWeight: '500',
+              textAlign: 'center',
+              fontFamily: 'Inter, sans-serif',
+              marginTop: '4px',
+              animation: 'fadeIn 0.2s ease'
+            }}>
+              {drawerError}
+            </div>
+          )}
 
           <div style={drawerStyles.actionsContainer}>
             <button 
               onClick={() => {
-                if (!newName.trim()) { alert('Введите название вещи'); return; }
-                if (!newImage) { alert('Добавить фото вещи'); return; }
+                // Проверяем все поля и красиво выводим подсказку
+                if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
+                if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
+                if (!newCategory) { setDrawerError('Выберите категорию вещи'); return; }
+                if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
+                if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
+                if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
                 
                 const newItem = {
                   id: Date.now(),
@@ -778,8 +881,16 @@ function App() {
 
                 setClothes([newItem, ...clothes]);
                 setIsDrawerOpen(false);
+                
+                // Полная очистка стейтов формы
                 setNewName('');
                 setNewImage(null);
+                setNewCategory('');
+                setNewSeason('');
+                setNewColor('');
+                setNewMaterial('');
+                setDrawerError(null); // Сбрасываем ошибку
+                
                 haptic('medium');
                 setCurrentScreen('profile'); 
               }} 
@@ -787,22 +898,64 @@ function App() {
             >
               Сохранить
             </button>
-            <button onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); }} style={drawerStyles.cancelBtn}>Отмена</button>
+            
           </div>
         </div>
       </div>
 
+      {/* КРАСИВОЕ ОКОШКО ПРОСМОТРА ТЕГОВ ВЕЩИ */}
+      {selectedItemForView && (
+        <>
+          <div 
+            onClick={() => setSelectedItemForView(null)} 
+            style={itemModalStyles.backdrop} 
+          />
+          <div style={itemModalStyles.box}>
+            <div style={itemModalStyles.header}>
+              <h3 style={itemModalStyles.title} className="fancy-serif">{selectedItemForView.name}</h3>
+              <button onClick={() => setSelectedItemForView(null)} style={itemModalStyles.closeBtn}>✕</button>
+            </div>
+
+            <div style={itemModalStyles.imageContainer}>
+              <img src={selectedItemForView.img} alt="" style={itemModalStyles.image} />
+            </div>
+
+            <div style={itemModalStyles.tagsContainer}>
+              <div style={itemModalStyles.tagRow}>
+                <span style={itemModalStyles.tagLabel}>Сезон:</span>
+                <span style={itemModalStyles.tagBadge}>
+                  {СЕЗОНЫ.find(s => s.id === selectedItemForView.season)?.name || selectedItemForView.season}
+                </span>
+              </div>
+
+              <div style={itemModalStyles.tagRow}>
+                <span style={itemModalStyles.tagLabel}>Цвет:</span>
+                <span style={itemModalStyles.tagBadge}>
+                  {ЦВЕТА.find(c => c.id === selectedItemForView.color)?.name || selectedItemForView.color}
+                </span>
+              </div>
+
+              <div style={itemModalStyles.tagRow}>
+                <span style={itemModalStyles.tagLabel}>Материал:</span>
+                <span style={itemModalStyles.tagBadge}>
+                  {МАТЕРИАЛЫ.find(m => m.id === selectedItemForView.material)?.name || selectedItemForView.material}
+                </span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
     </div>
   );
 }
 
-
 const ProfileGallery = ({ 
   clothes, setClothes, outfits, setOutfits, capsules, setCapsules, 
   searchQuery, setIsSearchOpen, haptic,
   setIsOutfitCreatorOpen, 
-  setIsDrawerOpen
+  setIsDrawerOpen,
+  onItemClick // <-- Теперь проп деструктурирован легально!
 }: any) => {
   const [activeTab, setActiveTab] = useState<'capsules' | 'outfits' | 'clothes'>('clothes');
   const [capsuleSubTab, setCapsuleSubTab] = useState<'8-3' | '10-5'>('8-3');
@@ -811,6 +964,7 @@ const ProfileGallery = ({
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [selectedColor, setSelectedColor] = useState<string>('all');
   const [selectedMaterial, setSelectedMaterial] = useState<string>('all');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
     setDeleteConfirm({ id, type });
@@ -830,6 +984,7 @@ const ProfileGallery = ({
   const filteredClothes = clothes.filter((item: WardrobeItem) => 
     !item.deletedAt && 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (selectedCategoryFilter === 'all' || item.category === selectedCategoryFilter) &&
     (selectedSeason === 'all' || item.season === selectedSeason) &&
     (selectedColor === 'all' || item.color === selectedColor) &&
     (selectedMaterial === 'all' || item.material === selectedMaterial)
@@ -854,7 +1009,6 @@ const ProfileGallery = ({
         ))}
       </div>
       
-
       {activeTab === 'clothes' && (
         <>
           <button 
@@ -878,7 +1032,18 @@ const ProfileGallery = ({
             + Добавить вещь
           </button>
 
-          <div style={galleryStyles.filterRow}>
+          <div style={{ ...galleryStyles.filterRow, gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+            
+            <select 
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)} 
+              style={galleryStyles.filterSelect}
+            >
+              <option value="all">Категория</option>
+              <option value="top">Верх</option>
+              <option value="bottom">Низ</option>
+              <option value="shoes">Обувь</option>
+              <option value="accessory">Аксессуары</option>
+            </select>
             <select onChange={(e) => setSelectedSeason(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Сезон</option>{СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
             <select onChange={(e) => setSelectedColor(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Цвет</option>{ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             <select onChange={(e) => setSelectedMaterial(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Материал</option>{МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
@@ -960,19 +1125,46 @@ const ProfileGallery = ({
           </div>
         ))}
 
-        {activeTab === 'clothes' && filteredClothes.map((item: WardrobeItem) => (
-          <div key={item.id} style={galleryStyles.card}>
-            <button onClick={(e) => { e.stopPropagation(); openDeleteModal(item.id, 'clothes'); }} style={galleryStyles.deleteBadge}>✕</button>
-            <div style={galleryStyles.imageWrapper}><img src={item.img} alt={item.name} style={galleryStyles.cardImage} /></div>
-            <span style={galleryStyles.cardTitle}>{item.name}</span>
-          </div>
-        ))}
+        {activeTab === 'clothes' && (
+          filteredClothes.length > 0 ? (
+            filteredClothes.map((item: any) => (
+              <div 
+                key={item.id} 
+                onClick={() => onItemClick(item)} 
+                style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
+              >
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDeleteModal(item.id, 'clothes');
+                  }}
+                  style={galleryStyles.deleteBadge}
+                >
+                  ✕
+                </button>
+                <div style={galleryStyles.imageWrapper}>
+                  <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                </div>
+                <span style={galleryStyles.cardTitle}>{item.name}</span>
+              </div>
+            ))
+          ) : (
+            <div style={galleryStyles.emptyState}>
+              {searchQuery.trim() !== '' ? 'Ничего не найдено по этому запросу' : 'Гардероб пуст. Добавьте вещи на главном экране'}
+            </div>
+          )
+        )}
 
-        {/* Рендеринг Аутфитов */}
         {activeTab === 'outfits' && filteredOutfits.map((outfit: any) => (
           <div key={outfit.id} style={galleryStyles.card}>
             <button onClick={(e) => { e.stopPropagation(); openDeleteModal(outfit.id, 'outfits'); }} style={galleryStyles.deleteBadge}>✕</button>
-            <div style={galleryStyles.outfitPreviewGrid}>{outfit.items.map((item: WardrobeItem, idx: number) => <img key={idx} src={item.img} style={galleryStyles.gridImage} />)}</div>
+            <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
+              <div style={outfitStyles.itemsGrid}>
+                {outfit.items.map((item: WardrobeItem, idx: number) => (
+                  <img key={idx} src={item.img} style={galleryStyles.gridImage} />
+                ))}
+              </div>
+            </div>
             <span style={galleryStyles.cardTitle}>{outfit.name}</span>
           </div>
         ))}
@@ -1390,14 +1582,18 @@ const widgetStyles: Record<string, React.CSSProperties> = {
   calendarGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)', 
-    rowGap: '4px', 
+    rowGap: '6px', 
     columnGap: '2px',
+    marginTop: '6px',
   },
   dayCell: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '16px',
+    aspectRatio: '1/1',
+    width: '18px',
+    height: '18px',
+    margin: '0 auto',
     boxSizing: 'border-box',
   },
   dayNumber: {
@@ -1465,12 +1661,15 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   },
   itemCount: {
-    fontSize: '12px',
-    color: '#6B6A69',
+    fontSize: '11px',
+    color: '#8B8A89',
     fontWeight: '500',
+    marginTop: '4px',
     marginBottom: '12px',
-    paddingLeft: '4px',
+    paddingLeft: '2px',
     fontFamily: 'Inter, sans-serif',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   },
   outfitPreviewGrid: {
     width: '100%',
@@ -1583,7 +1782,8 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     marginBottom: '20px',
   },
   filterRow: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr auto',
     gap: '8px',
     marginBottom: '16px',
     alignItems: 'center',
@@ -1766,6 +1966,93 @@ const cartPageStyles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     cursor: 'pointer',
     zIndex: 10,
+  },
+};
+
+const itemModalStyles: Record<string, React.CSSProperties> = {
+  backdrop: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    zIndex: 99998,
+  },
+  box: {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '85%',
+    maxWidth: '340px',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '24px',
+    padding: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.15)',
+    zIndex: 99999,
+    boxSizing: 'border-box',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#151414',
+    textTransform: 'uppercase',
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '18px',
+    color: '#8B8A89',
+    cursor: 'pointer',
+  },
+  imageContainer: {
+    width: '100%',
+    aspectRatio: '1/1',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    backgroundColor: '#E6E5E3',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  tagsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginTop: '4px',
+  },
+  tagRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '4px 0',
+    borderBottom: '0.5px solid rgba(21, 20, 20, 0.05)',
+  },
+  tagLabel: {
+    fontSize: '13px',
+    color: '#8B8A89',
+    fontFamily: 'Inter, sans-serif',
+  },
+  tagBadge: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#151414',
+    backgroundColor: '#E6E5E3',
+    padding: '4px 10px',
+    borderRadius: '8px',
+    fontFamily: 'Inter, sans-serif',
   },
 };
 
