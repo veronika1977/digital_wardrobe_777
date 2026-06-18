@@ -134,7 +134,6 @@ const PhotoPicker = ({ onImageSelected }: any) => {
 const BottomNavBar = ({ currentScreen, onScreenChange }: { currentScreen: string; onScreenChange: (screen: any) => void }) => {
   const tabs = [
     { id: 'home', label: 'ГС' },
-    { id: 'ai', label: 'ИИ' },
     { id: 'profile', label: 'ЛК' },
   ];
 
@@ -187,10 +186,6 @@ function App() {
 
   const [clothes, setClothes] = useLocalStorage<any[]>('clothes', []);
   const [outfits] = useLocalStorage<any[]>('outfits', []);
-
-  const [messages, setMessages] = useState<any[]>([
-    { id: 1, sender: 'ai', text: 'Привет! Скоро тут ИИ-стилист будет помогать собирать тебе образы!' }
-  ]);
   const [chatInput, setChatInput] = useState('');
 
   const { haptic } = useTelegram();
@@ -437,89 +432,6 @@ function App() {
         </div>
       )}
 
-      {currentScreen === 'ai' && (
-        <div style={pageStyle}>
-          
-          <div style={headerStyles.headerContainer}>
-            <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 6L15 30L26 6" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20 20C23.5 18 29.5 18 31.5 21.5C33 24 29 26.5 25 26.5C21 26.5 19 29.5 20.5 32C22.5 35 29.5 35 32 32.5" stroke="#151414" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            
-            <h1 style={headerStyles.headerTitle} className="fancy-serif">ИИ-СТИЛИСТ</h1>
-            
-            <button 
-              onClick={() => {
-                const query = prompt("Поиск по чату или вещам:", searchQuery);
-                if (query !== null) setSearchQuery(query);
-              }}
-              style={headerStyles.searchBtn}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="12" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </button>
-          </div>
-
-          <div style={chatStyles.chatContainer}>
-            <div style={chatStyles.messagesList}>
-              {messages.map((msg) => {
-                const isAI = msg.sender === 'ai';
-                return (
-                  <div key={msg.id} style={{ ...chatStyles.messageRow, justifyContent: isAI ? 'flex-start' : 'flex-end' }}>
-                    <div style={{
-                      ...chatStyles.bubble,
-                      backgroundColor: isAI ? '#FFFFFF' : '#151414',
-                      color: isAI ? '#151414' : '#FFFFFF',
-                      borderRadius: isAI ? '20px 20px 24px 4px' : '20px 20px 4px 24px',
-                      boxShadow: isAI ? '0px 4px 12px rgba(0,0,0,0.02)' : 'none'
-                    }}>
-                      {msg.text}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={chatStyles.inputZone}>
-              <input 
-                type="text" 
-                placeholder="Спроси у стилиста..." 
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (!chatInput.trim()) return;
-                    const userMsg = { id: Date.now(), sender: 'user', text: chatInput };
-                    setMessages(prev => [...prev, userMsg]);
-                    setChatInput('');
-                    haptic('light');
-                  }
-                }}
-                style={chatStyles.chatInput}
-              />
-              <button 
-                onClick={() => {
-                  if (!chatInput.trim()) return;
-                  const userMsg = { id: Date.now(), sender: 'user', text: chatInput };
-                  setMessages(prev => [...prev, userMsg]);
-                  setChatInput('');
-                  haptic('medium');
-                }}
-                style={chatStyles.sendBtn}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"></line>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {currentScreen === 'profile' && (
         <div style={pageStyle}>
