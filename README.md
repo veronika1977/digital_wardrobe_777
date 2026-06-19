@@ -31,8 +31,8 @@ Closet Flow is a Telegram Mini App for wardrobe management that helps users orga
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/closet-flow.git
-cd closet-flow
+git clone https://github.com/your-github-nickname/digital_wardrobe_777
+cd digital_wardrobe_777
 
 # Install dependencies
 npm install
