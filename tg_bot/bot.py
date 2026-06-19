@@ -1,17 +1,15 @@
 import asyncio
 import logging
-from dotenv import load_dotenv
-import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart, Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import BasicAuth
 
-load_dotenv()
+# --- Конфигурация ---
+TOKEN = "YOUR_BOT_TOKEN"
+MINI_APP_URL = "YOUR_APP_URL"
 
-TOKEN = os.getenv("BOT_TOKEN")
-MINI_APP_URL = os.getenv("MINI_APP_URL")
 logging.basicConfig(level=logging.INFO)
 
 dp = Dispatcher()
