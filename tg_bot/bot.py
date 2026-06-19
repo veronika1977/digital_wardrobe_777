@@ -7,8 +7,8 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import BasicAuth
 
 # --- Конфигурация ---
-TOKEN = "8930175741:AAFn20YgCQWSDh-avVP10H2gQrJml8-9m-I"
-MINI_APP_URL = "https://t.me/digital_wardrobe_app_bot/digital_wardrobe_app"
+TOKEN = "YOUR_API_TOKEN"
+MINI_APP_URL = "YOUR_LINK"
 
 logging.basicConfig(level=logging.INFO)
 
