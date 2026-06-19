@@ -7,8 +7,8 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import BasicAuth
 
 # --- Конфигурация ---
-TOKEN = "YOUR_BOT_TOKEN"
-MINI_APP_URL = "YOUR_APP_URL"
+TOKEN = "YOUR_API_TOKEN"
+MINI_APP_URL = "YOUR_LINK"
 
 logging.basicConfig(level=logging.INFO)
 
