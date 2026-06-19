@@ -14,8 +14,6 @@ logging.basicConfig(level=logging.INFO)
 
 dp = Dispatcher()
 
-
-# --- Хэндлер: /start ---
 @dp.message(CommandStart())
 async def command_start_handler(message: types.Message):
     user_name = message.from_user.first_name or "друг"
