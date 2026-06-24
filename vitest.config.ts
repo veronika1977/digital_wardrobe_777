@@ -8,5 +8,15 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        'vitest.config.ts',
+        'vite.config.ts',
+      ],
+    },
   },
 })
