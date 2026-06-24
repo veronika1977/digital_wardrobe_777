@@ -227,6 +227,7 @@ function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
   const [newName, setNewName] = useState('');
+  const [restoreConfirm, setRestoreConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [newSeason, setNewSeason] = useState('');
   const [newColor, setNewColor] = useState('');
@@ -589,8 +590,18 @@ function App() {
                 const deletedCapsules = capsules.filter((item: any) => item.deletedAt);
                 const hasDeletedItems = deletedClothes.length > 0 || deletedOutfits.length > 0 || deletedCapsules.length > 0;
 
-                const restoreItem = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
+                // ИСПРАВЛЕНО: Теперь функция не восстанавливает сразу, а открывает модалку
+                const requestRestore = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
+                  haptic('light');
+                  setRestoreConfirm({ id, type });
+                };
+
+                // НОВОЕ: Функция окончательного подтверждения восстановления
+                const executeRestore = () => {
+                  if (!restoreConfirm) return;
+                  const { id, type } = restoreConfirm;
                   haptic('medium');
+
                   if (type === 'clothes') {
                     setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
                   } else if (type === 'outfits') {
@@ -598,6 +609,7 @@ function App() {
                   } else if (type === 'capsules') {
                     setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
                   }
+                  setRestoreConfirm(null);
                 };
 
                 if (!hasDeletedItems) {
@@ -619,7 +631,7 @@ function App() {
                           {deletedOutfits.map((outfit: any) => (
                             <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
                               <button 
-                                onClick={() => restoreItem(outfit.id, 'outfits')}
+                                onClick={() => requestRestore(outfit.id, 'outfits')} // ИСПРАВЛЕНО
                                 style={cartPageStyles.restoreBtn}
                                 title="Восстановить"
                               >
@@ -652,7 +664,7 @@ function App() {
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  restoreItem(item.id, 'clothes');
+                                  requestRestore(item.id, 'clothes'); // ИСПРАВЛЕНО
                                 }}
                                 style={cartPageStyles.restoreBtn}
                               >
@@ -666,6 +678,27 @@ function App() {
                           ))}
                         </div>
                       </div>
+                    )}
+
+                    {/* НОВОЕ: Рендер модалки подтверждения восстановления */}
+                    {restoreConfirm && (
+                      <>
+                        <div onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmBackdrop} />
+                        <div style={galleryStyles.confirmBox}>
+                          <span style={galleryStyles.confirmText}>Восстановить этот элемент из корзины?</span>
+                          <div style={galleryStyles.confirmActions}>
+                            <button 
+                              onClick={executeRestore} 
+                              style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }} // Используем зеленый успех из темы
+                            >
+                              Да
+                            </button>
+                            <button onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmCancelBtn}>
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
                 );
