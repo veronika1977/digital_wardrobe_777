@@ -13,6 +13,20 @@ interface WardrobeItem {
   deletedAt: string | null;
 }
 
+interface PositionedItem extends WardrobeItem {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+interface Outfit {
+  id: number;
+  name: string;
+  items: PositionedItem[];
+  createdAt: string;
+  deletedAt: string | null;
+}
+
 const getTheme = () => {
   return {
     bg: '#E6E5E3',
@@ -34,7 +48,7 @@ const СЕЗОНЫ = [
   { id: 'spring', name: 'Весна', color: '#E8A87C' },
   { id: 'summer', name: 'Лето', color: '#F3D572' },
   { id: 'autumn', name: 'Осень', color: '#D4956A' },
-  { id: 'demiseason', name: 'Демисезон', color: '#A8C8A0' },
+  { id: 'base', name: 'База', color: '#A8C8A0' },
 ];
 
 const ЦВЕТА = [
@@ -74,7 +88,8 @@ const КАТЕГОРИИ = [
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
   useEffect(() => {
-    const media = window.matchMedia(query);
+    const media = window.matchMedia ? window.matchMedia(query) : null;
+    if (!media) return;
     if (media.matches !== matches) setMatches(media.matches);
     const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
     media.addEventListener('change', listener);
@@ -140,6 +155,12 @@ const PhotoPicker = ({ onImageSelected }: any) => {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
+            if (!file.type.startsWith('image/')) {
+              alert('Ошибка: Выбранный файл не является изображением! Пожалуйста, загрузите фото (JPEG, PNG, WebP).');
+              e.target.value = '';
+              return;
+            }
+
             const reader = new FileReader();
             reader.onloadend = () => {
               onImageSelected(reader.result as string);
@@ -200,7 +221,8 @@ function App() {
   const { initData, isTelegram, haptic } = useTelegram();
   const [, setToken] = useLocalStorage<string | null>('jwt_token', null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-  const [showWelcome, setShowWelcome] = useState<boolean>(true);
+  const [editingOutfitId, setEditingOutfitId] = useState<number | null>(null);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'profile' | 'cart'>('home');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
@@ -209,18 +231,23 @@ function App() {
   const [newSeason, setNewSeason] = useState('');
   const [newColor, setNewColor] = useState('');
   const [newMaterial, setNewMaterial] = useState('');
+  const [showEmptyOutfitAlert, setShowEmptyOutfitAlert] = useState(false);
   const [newImage, setNewImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [clothes, setClothes] = useLocalStorage<any[]>('clothes', []);
-  const [outfits, setOutfits] = useLocalStorage<any[]>('outfits', []); 
+  const [outfits, setOutfits] = useLocalStorage<Outfit[]>('outfits', []); 
   const [capsules, setCapsules] = useLocalStorage<any[]>('capsules', []); 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  
+  const [canvasItems, setCanvasItems] = useState<PositionedItem[]>([]);
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState('all');
   const [isOutfitCreatorOpen, setIsOutfitCreatorOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [outfitName, setOutfitName] = useState('');
-  const [onboardingStep, setOnboardingStep] = useState<number>(0);
 
   const getCalendarDays = () => {
     const now = new Date();
@@ -252,13 +279,54 @@ function App() {
 
   const calendarDays = getCalendarDays();
   
-  const toggleItemSelection = (item: any) => {
-    if (selectedItems.find((i: any) => i.id === item.id)) {
-      setSelectedItems(selectedItems.filter((i: any) => i.id !== item.id));
-    } else {
-      setSelectedItems([...selectedItems, item]);
-      haptic('light');
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent, id: number) => {
+    haptic('light');
+    setActiveDragId(id);
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const item = canvasItems.find(i => i.id === id);
+    if (item) {
+      setDragOffset({
+        x: clientX - item.x,
+        y: clientY - item.y
+      });
     }
+  };
+
+  const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (activeDragId === null) return;
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    setCanvasItems(prev => prev.map(item => {
+      if (item.id === activeDragId) {
+        return {
+          ...item,
+          x: clientX - dragOffset.x,
+          y: clientY - dragOffset.y
+        };
+      }
+      return item;
+    }));
+  };
+
+  const handleDragEnd = () => {
+    setActiveDragId(null);
+  };
+
+  const resetDrawerState = () => {
+    setIsDrawerOpen(false);
+    setNewName('');
+    setNewImage(null);
+    setNewCategory('');
+    setNewSeason('');
+    setNewColor('');
+    setNewMaterial('');
+    setDrawerError(null);
+    setEditingItemId(null);
   };
 
   useEffect(() => {
@@ -305,8 +373,9 @@ function App() {
   }, []);
 
   useEffect(() => {
+    setIsAuthLoading(false); 
+    
     if (!isTelegram) {
-      setIsAuthLoading(false);
       return;
     }
 
@@ -333,88 +402,12 @@ function App() {
           setIsAuthLoading(false);
         });
     }
-  }, [initData, isTelegram]);
+  }, [initData, isTelegram, setToken]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#edecea', position: 'relative', width: '100%', boxSizing: 'border-box' }}>
       
-      {!isTelegram && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          padding: '24px',
-          textAlign: 'center',
-          backgroundColor: '#edecea',
-          color: '#151414',
-          fontFamily: 'Inter, sans-serif'
-        }}>
-          <span style={{ fontSize: '48px', marginBottom: '16px' }}></span>
-          <h2 className="fancy-serif" style={{ fontSize: '20px', margin: '0 0 12px 0', letterSpacing: '1px' }}>Доступ ограничен</h2>
-          <p style={{ fontSize: '14px', color: '#6B6A69', margin: 0, maxWidth: '280px', lineHeight: '1.5' }}>
-            Пожалуйста, откройте это приложение внутри Telegram-бота «Цифровой гардероб».
-          </p>
-        </div>
-      )}
-
-      {isTelegram && !isAuthLoading && showWelcome && (
-        <div style={welcomeStyles.container}>
-          <div style={welcomeStyles.logoContainer}>
-            <img 
-              src="/Icon.png" 
-              alt="Digital Wardrobe Logo" 
-              style={welcomeStyles.logo} 
-            />
-          </div>
-
-          {/* Шаг 0: Приветствие (Твой исходный текст) */}
-          {onboardingStep === 0 && (
-            <>
-              <h1 className="fancy-serif" style={welcomeStyles.title}>ЦИФРОВОЙ ГАРДЕРОБ</h1>
-              <p style={welcomeStyles.subtitle}>
-                Добро пожаловать в ваш персональный стилист-ассистент. Составляйте образы, управляйте капсулами и планируйте гардероб в один клик.
-              </p>
-            </>
-          )}
-
-          {/* Шаг 1: Описание капсул */}
-          {onboardingStep === 1 && (
-            <>
-              <h1 className="fancy-serif" style={welcomeStyles.title}>УМНЫЕ КАПСУЛЫ</h1>
-              <p style={welcomeStyles.subtitle}>
-                Группируйте вещи по сезонам и стилям. Наше приложение подскажет, каких элементов не хватает для идеального сезонного набора.
-              </p>
-            </>
-          )}
-
-          {onboardingStep === 2 && (
-            <>
-              <h1 className="fancy-serif" style={welcomeStyles.title}>ГОТОВЫЕ АУТФИТЫ</h1>
-              <p style={welcomeStyles.subtitle}>
-                Генерация и сохранение стильных луков на каждый день с учётом актуальной погоды за окном.
-              </p>
-            </>
-          )}
-
-          <button 
-            style={welcomeStyles.startBtn}
-            onClick={() => {
-              haptic('medium');
-              if (onboardingStep < 2) {
-                setOnboardingStep(onboardingStep + 1);
-              } else {
-                setShowWelcome(false);
-              }
-            }}
-          >
-            {onboardingStep < 2 ? 'Далее' : 'Начать работу'}
-          </button>
-        </div>
-      )}
-      
-      {isTelegram && !isAuthLoading && !showWelcome && (
+      {!isAuthLoading && (
         <>
           {currentScreen === 'home' && (
             <div style={pageStyle}>
@@ -508,6 +501,7 @@ function App() {
                 <button 
                   style={homeStyles.addBtn} 
                   onClick={() => {
+                    setEditingItemId(null);
                     setIsDrawerOpen(true);
                     haptic('light');
                   }}
@@ -560,7 +554,13 @@ function App() {
                 haptic={haptic}
                 setIsOutfitCreatorOpen={setIsOutfitCreatorOpen}
                 setIsDrawerOpen={setIsDrawerOpen}
-                onItemClick={setSelectedItemForView} 
+                onItemClick={(item: any) => {
+                  setSelectedItemForView(item);
+                  haptic('light');
+                }}
+                setEditingOutfitId={setEditingOutfitId}
+                setCanvasItems={setCanvasItems}
+                setOutfitName={setOutfitName}
               />
             </div>
           )}
@@ -711,123 +711,347 @@ function App() {
             </>
           )}
 
+          {/* ПОЛНОЭКРАННЫЙ БЕЖЕВЫЙ КОНСТРУКТОР АУТФИТОВ */}
           {isOutfitCreatorOpen && (
-            <div style={drawerStyles.backdrop} onClick={() => setIsOutfitCreatorOpen(false)}>
-              <div 
-                style={{ ...drawerStyles.drawer, height: '80vh', maxHeight: '80vh', maxWidth: '380px', display: 'flex', flexDirection: 'column' }} 
-                onClick={e => e.stopPropagation()}
-              >
-                <div style={drawerStyles.header}>
-                  <h3 style={drawerStyles.headerTitle}>Создать образ</h3>
-                  <button onClick={() => setIsOutfitCreatorOpen(false)} style={drawerStyles.closeBtn}>✕</button>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', padding: '0 24px 12px 24px', overflowX: 'auto', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
-                  {КАТЕГОРИИ.map((cat) => (
-                    <button 
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      style={{
-                        padding: '8px 14px',
-                        borderRadius: '20px',
-                        border: 'none',
-                        backgroundColor: selectedCategory === cat.id ? '#151414' : '#E6E5E3',
-                        color: selectedCategory === cat.id ? '#FFFFFF' : '#151414',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
-                      }}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
+            <div 
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: '#edecea',
+                zIndex: 99999,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+              onMouseMove={handleDragMove}
+              onTouchMove={handleDragMove}
+              onMouseUp={handleDragEnd}
+              onTouchEnd={handleDragEnd}
+            >
+              <div style={{
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '16px',
+                backgroundColor: 'rgba(255,255,255,0.6)',
+                backdropFilter: 'blur(10px)',
+                borderBottom: '1px solid rgba(21, 20, 20, 0.05)'
+              }}>
+                <button 
+                  onClick={() => { 
+                    setIsOutfitCreatorOpen(false); 
+                    setCanvasItems([]); 
+                    setOutfitName(''); 
+                    setEditingOutfitId(null); 
+                  }}
+                  style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '500', color: '#6B6A69' }}
+                >
+                  Отмена
+                </button>
+                
+                <input 
+                  placeholder="Название аутфита" 
+                  value={outfitName}
+                  onChange={(e) => setOutfitName(e.target.value)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: '1px solid #151414',
+                    textAlign: 'center',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    outline: 'none',
+                    width: '50%'
+                  }}
+                />
 
-                <div style={{ flex: 1, overflowY: 'auto', padding: '4px 24px', WebkitOverflowScrolling: 'touch' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', paddingBottom: '16px' }}>
-                    {clothes
-                      .filter((item: WardrobeItem) => !item.deletedAt && (selectedCategory === 'all' || item.category === selectedCategory))
-                      .map((item: WardrobeItem) => (
-                        <div 
-                          key={item.id} 
-                          onClick={() => toggleItemSelection(item)} 
-                          style={{ 
-                            border: selectedItems.find((i: WardrobeItem) => i.id === item.id) ? '2px solid #151414' : '1px solid #E6E5E3', 
-                            borderRadius: '16px', 
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            aspectRatio: '1/1'
-                          }}
-                        >
-                          <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          {selectedItems.find((i: WardrobeItem) => i.id === item.id) && (
-                            <div style={{
-                              position: 'absolute',
-                              top: '6px',
-                              right: '6px',
-                              backgroundColor: '#151414',
-                              color: '#FFFFFF',
-                              borderRadius: '50%',
-                              width: '20px',
-                              height: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '11px',
-                              fontWeight: '600'
-                            }}>✓</div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                </div>
+                <button 
+                  onClick={() => {
+                    if (canvasItems.length === 0) {
+                      setShowEmptyOutfitAlert(true);
+                      haptic('heavy');
+                      return;
+                    }
 
-                <div style={{ padding: '16px 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#FFFFFF', borderTop: '1px solid #E6E5E3', flexShrink: 0 }}>
-                  <input 
-                    placeholder="Название образа" 
-                    value={outfitName}
-                    onChange={(e) => setOutfitName(e.target.value)} 
-                    style={drawerStyles.input} 
-                  />
-                  <button 
-                    style={{ ...drawerStyles.saveBtn, flex: 'none', width: '100%', padding: '10px 0', borderRadius: '12px', fontSize: '14px', fontWeight: '500', letterSpacing: '0.3px', boxSizing: 'border-box' }} 
-                    onClick={() => {
-                      if (selectedItems.length === 0) {
-                        alert('Выберите хотя бы одну вещь для образа');
-                        return;
-                      }
+                    if (editingOutfitId) {
+                      setOutfits(outfits.map((o: any) => 
+                        o.id === editingOutfitId 
+                          ? { ...o, name: outfitName || "Мой образ", items: canvasItems } 
+                          : o
+                      ));
+                    } else {
                       setOutfits([{ 
                         id: Date.now(), 
                         name: outfitName || "Мой образ", 
-                        items: selectedItems, 
+                        items: canvasItems, 
                         createdAt: new Date().toISOString(), 
                         deletedAt: null 
                       }, ...outfits]);
-                      setIsOutfitCreatorOpen(false); 
-                      setSelectedItems([]); 
-                      setOutfitName('');
+                    }
+
+                    setIsOutfitCreatorOpen(false); 
+                    setCanvasItems([]); 
+                    setOutfitName('');
+                    setEditingOutfitId(null);
+                    haptic('medium');
+                  }}
+                  style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#151414' }}
+                >
+                  Готово
+                </button>
+              </div>
+
+              <div style={{ flex: 1, position: 'relative', width: '100%', overflow: 'hidden' }}>
+                {canvasItems.length === 0 && (
+                  <div style={{
+                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                    color: '#8B8A89', textAlign: 'center', pointerEvents: 'none', width: '80%'
+                  }}>
+                    <p className="fancy-serif" style={{ fontSize: '18px', margin: '0 0 8px 0' }}>Ваш будущий образ</p>
+                    <p style={{ fontSize: '13px', margin: 0 }}>Нажмите «+ Добавить вещи» снизу, чтобы выложить их сюда, и двигайте пальцем</p>
+                  </div>
+                )}
+
+                {/* Рендерим вещи на холсте */}
+                {canvasItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onMouseDown={(e) => handleDragStart(e, item.id)}
+                    onTouchStart={(e) => handleDragStart(e, item.id)}
+                    style={{
+                      position: 'absolute',
+                      left: `${item.x}px`,
+                      top: `${item.y}px`,
+                      transform: `scale(${item.scale})`,
+                      transformOrigin: 'center center',
+                      cursor: 'move',
+                      touchAction: 'none',
+                      userSelect: 'none',
+                      zIndex: activeDragId === item.id ? 1000 : 10
                     }}
                   >
-                    Сохранить
-                  </button>
-                </div>
+                    <button
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCanvasItems(canvasItems.filter(i => i.id !== item.id));
+                        haptic('light');
+                      }}
+                      style={{
+                        position: 'absolute', top: '-8px', right: '-8px',
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        backgroundColor: '#151414', color: '#fff', border: 'none',
+                        fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 15, cursor: 'pointer'
+                      }}
+                    >
+                      ✕
+                    </button>
+
+                    <img 
+                      src={item.img} 
+                      alt="" 
+                      draggable="false"
+                      style={{
+                        width: '110px',
+                        aspectRatio: '1/1',
+                        objectFit: 'cover',
+                        borderRadius: '16px',
+                        boxShadow: activeDragId === item.id ? '0px 12px 24px rgba(0,0,0,0.15)' : '0px 4px 12px rgba(0,0,0,0.06)',
+                        backgroundColor: '#fff',
+                        border: '1px solid rgba(0,0,0,0.02)',
+                        transition: 'box-shadow 0.1s ease'
+                      }} 
+                    />
+
+                    <div 
+                      onTouchStart={(e) => e.stopPropagation()}
+                      style={{
+                        display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '6px'
+                      }}
+                    >
+                      <button 
+                        onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.max(0.5, i.scale - 0.15) } : i))}
+                        style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        -
+                      </button>
+                      <button 
+                        onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.min(2, i.scale + 0.15) } : i))}
+                        style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* МОДАЛКА ПРЕДУПРЕЖДЕНИЯ (Теперь внутри правильного контекста экрана) */}
+                {showEmptyOutfitAlert && (
+                  <>
+                    <div 
+                      onClick={() => setShowEmptyOutfitAlert(false)} 
+                      style={galleryStyles.confirmBackdrop} 
+                    />
+                    <div style={galleryStyles.confirmBox}>
+                      <span style={galleryStyles.confirmText}>
+                        Добавьте хотя бы одну вещь, чтобы сохранить аутфит.
+                      </span>
+                      <div style={{ ...galleryStyles.confirmActions, marginTop: '8px' }}>
+                        <button 
+                          onClick={() => setShowEmptyOutfitAlert(false)} 
+                          style={{ 
+                            ...galleryStyles.confirmDeleteBtn, 
+                            backgroundColor: '#151414',
+                            padding: '12px' 
+                          }}
+                        >
+                          Понятно
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Кнопка добавления вещей на холст */}
+              <div style={{ padding: '20px', backgroundColor: 'transparent', display: 'flex', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setIsItemPickerOpen(true)}
+                  style={{
+                    padding: '16px 32px',
+                    backgroundColor: '#151414',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '20px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    boxShadow: '0px 8px 24px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  + Добавить вещи на экран
+                </button>
+              </div>
+
+              {/* Пикер вещей для холста */}
+              {isItemPickerOpen && (
+                <div 
+                  onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }}
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
+                >
+                  <div 
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0, height: '70vh',
+                      backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px',
+                      display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontWeight: '600', fontSize: '16px' }}>Выберите вещи</span>
+                      <button onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }} style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>✕</button>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '8px', 
+                      paddingBottom: '12px', 
+                      overflowX: 'auto', 
+                      flexShrink: 0, 
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none'
+                    }}>
+                      {КАТЕГОРИИ.map((cat) => (
+                        <button 
+                          key={cat.id}
+                          onClick={() => { setPickerCategory(cat.id); haptic('light'); }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            border: 'none',
+                            backgroundColor: pickerCategory === cat.id ? '#151414' : '#E6E5E3',
+                            color: pickerCategory === cat.id ? '#FFFFFF' : '#151414',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
+                      {clothes
+                        .filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory))
+                        .map((item: any) => {
+                          const isAlreadyOnCanvas = canvasItems.some(i => i.id === item.id);
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => {
+                                if (isAlreadyOnCanvas) {
+                                  setCanvasItems(canvasItems.filter(i => i.id !== item.id));
+                                } else {
+                                  setCanvasItems([...canvasItems, { 
+                                    ...item, 
+                                    x: window.innerWidth / 2 - 55, 
+                                    y: window.innerHeight / 3, 
+                                    scale: 1 
+                                  }]);
+                                  haptic('light');
+                                }
+                              }}
+                              style={{
+                                aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative',
+                                border: isAlreadyOnCanvas ? '3px solid #151414' : '1px solid #E6E5E3',
+                                opacity: isAlreadyOnCanvas ? 0.6 : 1,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                              {isAlreadyOnCanvas && (
+                                <div style={{
+                                  position: 'absolute', top: '4px', right: '4px', backgroundColor: '#151414',
+                                  color: '#fff', borderRadius: '50%', width: '18px', height: '18px',
+                                  fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>✓</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      
+                      {clothes.filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory)).length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8B8A89', fontSize: '13px', paddingTop: '40px' }}>
+                          В этой категории пока нет вещей
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {isDrawerOpen && (
-            <div onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); setNewCategory(''); setNewSeason(''); setNewColor(''); setNewMaterial(''); setDrawerError(null); }} style={drawerStyles.backdrop} />
+            <div onClick={resetDrawerState} style={drawerStyles.backdrop} />
           )}
 
           <div style={{ ...drawerStyles.drawer, display: isDrawerOpen ? 'flex' : 'none' }}>
             <div style={drawerStyles.header}>
               <div style={drawerStyles.headerLeft}>
-                <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>+</span>
-                <h3 style={drawerStyles.headerTitle}>Новая вещь</h3>
+                <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>
+                  {editingItemId ? '✎' : '+'}
+                </span>
+                <h3 style={drawerStyles.headerTitle}>
+                  {editingItemId ? 'Редактировать вещь' : 'Новая вещь'}
+                </h3>
               </div>
-              <button onClick={() => { setIsDrawerOpen(false); setNewName(''); setNewImage(null); setNewCategory(''); setNewSeason(''); setNewColor(''); setNewMaterial(''); setDrawerError(null); }} style={drawerStyles.closeBtn}>✕</button>
+              <button onClick={resetDrawerState} style={drawerStyles.closeBtn}>✕</button>
             </div>
 
             <div style={drawerStyles.scrollContainer}>
@@ -842,30 +1066,36 @@ function App() {
                 </div>
               )}
 
-              <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
+              {!editingItemId && (
+                <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
+              )}
 
               <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled selected hidden>Категория</option>
+                <option value="" disabled hidden>Категория</option>
                 <option value="top">Верх</option>
                 <option value="bottom">Низ</option>
                 <option value="shoes">Обувь</option>
                 <option value="accessory">Аксессуары</option>
               </select>
 
-              <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled selected hidden>Сезон</option>
-                {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              {!editingItemId && (
+                <>
+                  <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
+                    <option value="" disabled hidden>Сезон</option>
+                    {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
 
-              <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled selected hidden>Цвет</option>
-                {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                  <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={drawerStyles.select}>
+                    <option value="" disabled hidden>Цвет</option>
+                    {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
 
-              <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled selected hidden>Материал</option>
-                {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+                  <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
+                    <option value="" disabled hidden>Материал</option>
+                    {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </>
+              )}
               
               {drawerError && (
                 <div style={{
@@ -889,33 +1119,37 @@ function App() {
                 <button 
                   onClick={() => {
                     if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
-                    if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
                     if (!newCategory) { setDrawerError('Выберите категорию вещи'); return; }
-                    if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
-                    if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
-                    if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
-                    
-                    const newItem = {
-                      id: Date.now(),
-                      name: newName,
-                      category: newCategory,
-                      season: newSeason,
-                      color: newColor,
-                      material: newMaterial,
-                      img: newImage,
-                      createdAt: new Date().toISOString(),
-                      deletedAt: null,
-                    };
 
-                    setClothes([newItem, ...clothes]);
-                    setIsDrawerOpen(false);
-                    setNewName('');
-                    setNewImage(null);
-                    setNewCategory('');
-                    setNewSeason('');
-                    setNewColor('');
-                    setNewMaterial('');
-                    setDrawerError(null);
+                    if (!editingItemId) {
+                      if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
+                      if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
+                      if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
+                      if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
+                    }
+                    
+                    if (editingItemId) {
+                      setClothes(clothes.map((item: any) => 
+                        item.id === editingItemId 
+                          ? { ...item, category: newCategory, img: newImage }
+                          : item
+                      ));
+                    } else {
+                      const newItem = {
+                        id: Date.now(),
+                        name: newName,
+                        category: newCategory,
+                        season: newSeason,
+                        color: newColor,
+                        material: newMaterial,
+                        img: newImage,
+                        createdAt: new Date().toISOString(),
+                        deletedAt: null,
+                      };
+                      setClothes([newItem, ...clothes]);
+                    }
+
+                    resetDrawerState();
                     haptic('medium');
                     setCurrentScreen('profile'); 
                   }} 
@@ -931,8 +1165,7 @@ function App() {
             <>
               <div 
                 onClick={() => setSelectedItemForView(null)} 
-                style={itemModalStyles.backdrop} 
-              />
+                style={itemModalStyles.backdrop} />
               <div style={itemModalStyles.box}>
                 <div style={itemModalStyles.header}>
                   <h3 style={itemModalStyles.title} className="fancy-serif">{selectedItemForView.name}</h3>
@@ -961,6 +1194,36 @@ function App() {
                     </span>
                   </div>
                 </div>
+
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#151414',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginTop: '8px'
+                  }}
+                  onClick={() => {
+                    setEditingItemId(selectedItemForView.id);
+                    setNewName(selectedItemForView.name);
+                    setNewCategory(selectedItemForView.category);
+                    setNewSeason(selectedItemForView.season);
+                    setNewColor(selectedItemForView.color);
+                    setNewMaterial(selectedItemForView.material);
+                    setNewImage(selectedItemForView.img);
+                    
+                    setSelectedItemForView(null);
+                    setIsDrawerOpen(true);
+                    haptic('light');
+                  }}
+                >
+                  Редактировать
+                </button>
               </div>
             </>
           )}
@@ -976,16 +1239,19 @@ const ProfileGallery = ({
   searchQuery, setIsSearchOpen, haptic,
   setIsOutfitCreatorOpen, 
   setIsDrawerOpen,
-  onItemClick
+  onItemClick,
+  setEditingOutfitId,
+  setCanvasItems,
+  setOutfitName
 }: any) => {
   const [activeTab, setActiveTab] = useState<'capsules' | 'outfits' | 'clothes'>('clothes');
   const [capsuleSubTab, setCapsuleSubTab] = useState<'8-3' | '10-5'>('8-3');
   
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
-  const [selectedSeason, setSelectedSeason] = useState<string>('all');
-  const [selectedColor, setSelectedColor] = useState<string>('all');
-  const [selectedMaterial, setSelectedMaterial] = useState<string>('all');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [selectedSeason, setSelectedSeason] = useState<string>('');
+  const [selectedColor, setSelectedColor] = useState<string>('');
+  const [selectedMaterial, setSelectedMaterial] = useState<string>('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
   const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
     setDeleteConfirm({ id, type });
@@ -1005,10 +1271,10 @@ const ProfileGallery = ({
   const filteredClothes = clothes.filter((item: WardrobeItem) => 
     !item.deletedAt && 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (selectedCategoryFilter === 'all' || item.category === selectedCategoryFilter) &&
-    (selectedSeason === 'all' || item.season === selectedSeason) &&
-    (selectedColor === 'all' || item.color === selectedColor) &&
-    (selectedMaterial === 'all' || item.material === selectedMaterial)
+    (selectedCategoryFilter === '' || item.category === selectedCategoryFilter) &&
+    (selectedSeason === '' || item.season === selectedSeason) &&
+    (selectedColor === '' || item.color === selectedColor) &&
+    (selectedMaterial === '' || item.material === selectedMaterial)
   );
   
   const filteredOutfits = outfits.filter((item: any) => !item.deletedAt && item.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -1055,19 +1321,57 @@ const ProfileGallery = ({
 
           <div style={{ ...galleryStyles.filterRow, gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
             <select 
+              value={selectedCategoryFilter} 
               onChange={(e) => setSelectedCategoryFilter(e.target.value)} 
               style={galleryStyles.filterSelect}
             >
-              <option value="all">Категория</option>
+              <option value="" disabled hidden>Категория</option>
+              <option value="">Все</option>
               <option value="top">Верх</option>
               <option value="bottom">Низ</option>
               <option value="shoes">Обувь</option>
               <option value="accessory">Аксессуары</option>
             </select>
-            <select onChange={(e) => setSelectedSeason(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Сезон</option>{СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-            <select onChange={(e) => setSelectedColor(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Цвет</option>{ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-            <select onChange={(e) => setSelectedMaterial(e.target.value)} style={galleryStyles.filterSelect}><option value="all">Материал</option>{МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-            <button style={galleryStyles.searchCircle} onClick={() => setIsSearchOpen(true)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="12" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
+
+            <select 
+              value={selectedSeason} 
+              onChange={(e) => setSelectedSeason(e.target.value)} 
+              style={galleryStyles.filterSelect}
+            >
+              <option value="" disabled hidden>Сезон</option>
+              <option value="">Все</option>
+              {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+
+            <select 
+              value={selectedColor} 
+              onChange={(e) => setSelectedColor(e.target.value)} 
+              style={galleryStyles.filterSelect}
+            >
+              <option value="" disabled hidden>Цвет</option>
+              <option value="">Все</option>
+              {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            <select  
+              value={selectedMaterial}  
+              onChange={(e) => setSelectedMaterial(e.target.value)}  
+              style={galleryStyles.filterSelect}
+            >
+              <option value="" disabled hidden>Материал</option>
+              <option value="">Все</option>
+              {/* ИСПРАВЛЕНО: заменена латинская 'M' на русскую 'М' и добавлен тип для 'm' */}
+              {МАТЕРИАЛЫ.map((m: { id: string; name: string }) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+
+            <button style={galleryStyles.searchCircle} onClick={() => setIsSearchOpen(true)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="11" cy="12" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
           </div>
         </>
       )}
@@ -1120,7 +1424,12 @@ const ProfileGallery = ({
       )}
 
       {activeTab === 'outfits' && (
-        <button style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600'}} onClick={() => setIsOutfitCreatorOpen(true)}>+ Создать новый аутфит</button>
+        <button 
+          style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600'}} 
+          onClick={() => setIsOutfitCreatorOpen(true)}
+        >
+          + Создать новый аутфит
+        </button>
       )}
 
       {activeTab === 'capsules' && (
@@ -1176,16 +1485,62 @@ const ProfileGallery = ({
         )}
 
         {activeTab === 'outfits' && filteredOutfits.map((outfit: any) => (
-          <div key={outfit.id} style={galleryStyles.card}>
+          <div key={outfit.id} style={{ ...galleryStyles.card, padding: '12px' }}>
             <button onClick={(e) => { e.stopPropagation(); openDeleteModal(outfit.id, 'outfits'); }} style={galleryStyles.deleteBadge}>✕</button>
-            <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
-              <div style={outfitStyles.itemsGrid}>
-                {outfit.items.map((item: WardrobeItem, idx: number) => (
-                  <img key={idx} src={item.img} style={galleryStyles.gridImage} />
-                ))}
-              </div>
+            
+            <div style={{ 
+              width: '100%', 
+              aspectRatio: '1/1', 
+              backgroundColor: '#E6E5E3', 
+              borderRadius: '12px', 
+              position: 'relative', 
+              overflow: 'hidden',
+              border: '1px solid rgba(21, 20, 20, 0.05)'
+            }}>
+              {outfit.items.map((item: any) => {
+                const factor = 0.3; 
+                return (
+                  <img 
+                    key={item.id} 
+                    src={item.img} 
+                    alt="" 
+                    style={{
+                      position: 'absolute',
+                      left: `${item.x * factor}px`,
+                      top: `${item.y * factor}px`,
+                      width: `${110 * factor * (item.scale || 1)}px`,
+                      height: `${110 * factor * (item.scale || 1)}px`,
+                      objectFit: 'cover',
+                      borderRadius: '6px'
+                    }} 
+                  />
+                );
+              })}
             </div>
-            <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <span style={{ ...galleryStyles.cardTitle, margin: 0, maxWidth: '70%' }}>{outfit.name}</span>
+              <button 
+                onClick={() => {
+                  setEditingOutfitId(outfit.id);
+                  setCanvasItems(outfit.items);
+                  setOutfitName(outfit.name);
+                  setIsOutfitCreatorOpen(true);
+                  haptic('light');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#151414',
+                  fontWeight: '600'
+                }}
+              >
+                ✎
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -1956,6 +2311,7 @@ const cartPageStyles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(21, 20, 20, 0.05)',
     fontFamily: 'Inter, sans-serif',
   },
+  emptyIcon: {},
   emptyText: {
     fontSize: '18px',
     fontWeight: '600',
@@ -2075,61 +2431,6 @@ const itemModalStyles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     borderRadius: '8px',
     fontFamily: 'Inter, sans-serif',
-  },
-};
-
-const welcomeStyles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '100vh',
-    padding: '32px 24px',
-    textAlign: 'center',
-    backgroundColor: '#edecea',
-    color: '#151414',
-    boxSizing: 'border-box',
-    fontFamily: 'Inter, sans-serif',
-  },
-  logoContainer: {
-    width: '120px',
-    height: '120px',
-    marginBottom: '24px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logo: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: '600',
-    margin: '0 0 16px 0',
-    letterSpacing: '1px',
-  },
-  subtitle: {
-    fontSize: '15px',
-    color: '#6B6A69',
-    lineHeight: '1.6',
-    margin: '0 0 48px 0',
-    maxWidth: '280px',
-  },
-  startBtn: {
-    width: '100%',
-    maxWidth: '280px',
-    padding: '16px',
-    backgroundColor: '#151414',
-    color: '#FFFFFF',
-    border: 'none',
-    borderRadius: '16px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0px 6px 20px rgba(0, 0, 0, 0.1)',
   },
 };
 
