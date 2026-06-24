@@ -1,16 +1,30 @@
-name: User Story
-description: Creating a new user story
-title: "US-XX: Short title"
-labels: ["user-story", "pbi"]
+description: Template for tracking PBIs or Course Tasks
+title: "[Task]: Short description"
+labels: ["task"]
 body:
   - type: dropdown
-    id: requirement_status
+    id: category
     attributes:
-      label: Requirement status
+      label: Task Category
       options:
-        - Active
-        - Removed
-        - Deferred
+        - PBI (Product Improvement)
+        - Course Task (Reporting/Admin)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Work Type
+      options:
+        - Feature / User Story Support
+        - Bug Fix
+        - Technical Debt
+        - Documentation
+        - DevOps / CI/CD / Infrastructure
+        - Testing / QA
+        - Research / Spike
+        - Course Assignment / Packaging
     validations:
       required: true
 
@@ -18,7 +32,7 @@ body:
     id: work_status
     attributes:
       label: Work Status
-      description: "Use only: To Do, Ready, In Progress, Review, Done"
+      description: "Use ONLY: To Do, Ready, In Progress, Review, Done"
       options:
         - To Do
         - Ready
@@ -29,37 +43,19 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: moscow
+  - type: textarea
+    id: description
     attributes:
-      label: MoSCoW priority
-      options:
-        - Must Have
-        - Should Have
-        - Could Have
-        - Won't Have
+      label: Context & Description
+      placeholder: "What is the current situation? Why is this needed?"
     validations:
       required: true
 
-  - type: input
-    id: persona
+  - type: textarea
+    id: expected_outcome
     attributes:
-      label: Type of user / persona
-      placeholder: "As a [type of user / persona]"
-    validations:
-      required: true
-  - type: input
-    id: action
-    attributes:
-      label: Specific action
-      placeholder: "I want to [perform a specific action]"
-    validations:
-      required: true
-  - type: input
-    id: value
-    attributes:
-      label: Goal or value
-      placeholder: "so that [I achieve a specific goal or value]"
+      label: Expected Outcome
+      description: "Clear, specific description of what will be delivered or changed."
     validations:
       required: true
 
@@ -67,7 +63,6 @@ body:
     id: implementer
     attributes:
       label: Implementer (@username)
-      description: "The person responsible for doing the work."
       placeholder: "@username"
     validations:
       required: true
@@ -75,23 +70,16 @@ body:
     id: reviewer
     attributes:
       label: Reviewer (@username)
-      description: "A DIFFERENT person responsible for reviewing the work and confirming it is ready."
+      description: "MUST be a different person than the Implementer."
       placeholder: "@username"
     validations:
       required: true
 
   - type: textarea
-    id: notes
-    attributes:
-      label: Notes, constraints, assumptions, or open questions
-    validations:
-      required: false
-
-  - type: textarea
     id: acceptance
     attributes:
       label: Acceptance Criteria
-      description: "Must be specific, observable, and testable (Given/When/Then recommended)."
+      description: "Must be specific, observable, and testable. Gherkin (Given/When/Then) is recommended."
       placeholder: |
         - [ ] Given [context], When [action], Then [outcome]
         - [ ] Criterion 2
@@ -102,7 +90,7 @@ body:
     id: traceability
     attributes:
       label: Traceability & Links
-      description: "Link related PBIs, parent Epic, or expected PR/MR here."
-      placeholder: "- Related to: #\n- Blocked by: #"
+      description: "Link parent User Story, related PBIs, or expected PR/MR."
+      placeholder: "- Related to US-XX: #\n- PR/MR link will be added here:"
     validations:
       required: false
