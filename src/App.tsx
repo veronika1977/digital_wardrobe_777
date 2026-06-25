@@ -55,15 +55,15 @@ const ЦВЕТА = [
   { id: 'white', name: 'Белый', hex: '#FFFFFF' },
   { id: 'black', name: 'Черный', hex: '#000000' },
   { id: 'beige', name: 'Бежевый', hex: '#D4C5B9' },
-  { id: 'brown', name: 'Коричневый', hex: '#8B6F4E' },
+  { id: 'brown', name: 'Коричневый', hex: '#5f4f3d' },
   { id: 'navy', name: 'Темно-синий', hex: '#2C3E50' },
-  { id: 'grey', name: 'Серый', hex: '#95A5A6' },
-  { id: 'red', name: 'Красный', hex: '#E57373' },
-  { id: 'blue', name: 'Синий', hex: '#6BB5E0' },
-  { id: 'green', name: 'Зеленый', hex: '#81C784' },
-  { id: 'pink', name: 'Розовый', hex: '#F8B4B4' },
-  { id: 'purple', name: 'Фиолетовый', hex: '#C4A4D4' },
-  { id: 'orange', name: 'Оранжевый', hex: '#F39C12' },
+  { id: 'grey', name: 'Серый', hex: '#969d9d' },
+  { id: 'red', name: 'Красный', hex: '#e11d1d' },
+  { id: 'blue', name: 'Синий', hex: '#2d28c6' },
+  { id: 'green', name: 'Зеленый', hex: '#46904a' },
+  { id: 'pink', name: 'Розовый', hex: '#ef6bb4' },
+  { id: 'purple', name: 'Фиолетовый', hex: '#7e11b4' },
+  { id: 'orange', name: 'Оранжевый', hex: '#f37f12' },
   { id: 'yellow', name: 'Желтый', hex: '#F1C40F' },
 ];
 
@@ -1134,33 +1134,42 @@ const confirmDelete = () => {
               )}
 
               {!editingItemId && (
-                <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
-              )}
-
-              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled hidden>Категория</option>
-                <option value="top">Верх</option>
-                <option value="bottom">Низ</option>
-                <option value="shoes">Обувь</option>
-                <option value="accessory">Аксессуары</option>
-              </select>
-
-              {!editingItemId && (
                 <>
                   <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
                     <option value="" disabled hidden>Сезон</option>
                     {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
 
-                  <select value={newColor} onChange={(e) => setNewColor(e.target.value)} style={drawerStyles.select}>
-                    <option value="" disabled hidden>Цвет</option>
-                    {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-
                   <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
                     <option value="" disabled hidden>Материал</option>
                     {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', width: '100%' }}>
+                    <span style={{ fontSize: '12px', color: '#6B6A69', fontWeight: '500', paddingLeft: '4px' }}>Цвет вещи:</span>
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 2px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                      {ЦВЕТА.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => { setNewColor(c.id); haptic('light'); }}
+                          style={{
+                            flexShrink: 0,
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '10px',
+                            backgroundColor: c.hex,
+                            border: newColor === c.id ? '2.5px solid #151414' : c.id === 'white' ? '1px solid #D4D3D1' : 'none',
+                            boxShadow: '0px 2px 6px rgba(0,0,0,0.06)',
+                            cursor: 'pointer',
+                            transform: newColor === c.id ? 'scale(1.05)' : 'none',
+                            transition: 'all 0.1s ease'
+                          }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
               
@@ -1250,9 +1259,17 @@ const confirmDelete = () => {
                   </div>
                   <div style={itemModalStyles.tagRow}>
                     <span style={itemModalStyles.tagLabel}>Цвет:</span>
-                    <span style={itemModalStyles.tagBadge}>
-                      {ЦВЕТА.find(c => c.id === selectedItemForView.color)?.name || selectedItemForView.color}
-                    </span>
+                    <div 
+                      style={{
+                        width: '45px',
+                        height: '14px',
+                        borderRadius: '6px',
+                        backgroundColor: ЦВЕТА.find(c => c.id === selectedItemForView.color)?.hex || '#8B8A89',
+                        border: selectedItemForView.color === 'white' ? '1px solid #D4D3D1' : 'none',
+                        boxShadow: '0px 1px 3px rgba(0,0,0,0.05)'
+                      }} 
+                      title={ЦВЕТА.find(c => c.id === selectedItemForView.color)?.name || selectedItemForView.color}
+                    />
                   </div>
                   <div style={itemModalStyles.tagRow}>
                     <span style={itemModalStyles.tagLabel}>Материал:</span>
@@ -1440,6 +1457,7 @@ const ProfileGallery = ({
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
+  const [isColorDropdownOpen, setIsColorDropdownOpen] = useState<boolean>(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
 const filteredClothes = (clothes || []).filter((item: WardrobeItem) => 
@@ -1523,16 +1541,6 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
             </select>
 
             <select 
-              value={selectedColor} 
-              onChange={(e) => setSelectedColor(e.target.value)} 
-              style={galleryStyles.filterSelect}
-            >
-              <option value="" disabled hidden>Цвет</option>
-              <option value="">Все</option>
-              {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-
-            <select   
               value={selectedMaterial}  
               onChange={(e) => setSelectedMaterial(e.target.value)}  
               style={galleryStyles.filterSelect}
@@ -1543,6 +1551,85 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+
+            {/* Кастомный выпадающий список для цвета */}
+            <div style={{ position: 'relative', width: '100%' }}>
+              <button 
+                onClick={() => setIsColorDropdownOpen(!isColorDropdownOpen)}
+                style={{
+                  ...galleryStyles.filterSelect,
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  paddingRight: '20px',
+                  cursor: 'pointer',
+                  width: '100%',
+                  height: '100%',
+                  minHeight: '31px'
+                }}
+              >
+                {selectedColor ? (
+                  <div style={{
+                    width: '100%',
+                    height: '8px',
+                    borderRadius: '3px',
+                    backgroundColor: ЦВЕТА.find(c => c.id === selectedColor)?.hex,
+                    border: selectedColor === 'white' ? '1px solid #D4D3D1' : 'none'
+                  }} />
+                ) : (
+                  <span>Цвет</span>
+                )}
+              </button>
+              
+              {isColorDropdownOpen && (
+                <>
+                  <div onClick={() => setIsColorDropdownOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    boxShadow: '0px 4px 16px rgba(0,0,0,0.12)',
+                    zIndex: 999,
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    padding: '4px',
+                    scrollbarWidth: 'none'
+                  }}>
+                    <div 
+                      onClick={() => { setSelectedColor(''); setIsColorDropdownOpen(false); haptic('light'); }}
+                      style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', color: '#151414' }}
+                    >
+                      Все
+                    </div>
+                    {ЦВЕТА.map(c => (
+                      <div
+                        key={c.id}
+                        onClick={() => { setSelectedColor(c.id); setIsColorDropdownOpen(false); haptic('light'); }}
+                        style={{
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{
+                          width: '100%',
+                          height: '10px',
+                          borderRadius: '3px',
+                          backgroundColor: c.hex,
+                          border: c.id === 'white' ? '1px solid #D4D3D1' : 'none'
+                        }} title={c.name} />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             <button style={galleryStyles.searchCircle} onClick={() => setIsSearchOpen(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="2.5" strokeLinecap="round">
