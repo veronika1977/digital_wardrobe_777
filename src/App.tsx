@@ -448,7 +448,7 @@ const confirmDelete = () => {
               </div>
 
               <div style={outfitStyles.sectionContainer}>
-                <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Аутфит сегодня</h2>
+                <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Образ сегодня</h2>
                 <div style={outfitStyles.mainRow}>
                   <div style={outfitStyles.outfitCard}>
                     {outfits.length > 0 ? (
@@ -658,27 +658,41 @@ const confirmDelete = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     {deletedOutfits.length > 0 && (
                       <div>
-                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные аутфиты</span>
+                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные образы</span>
                         <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
-                          {deletedOutfits.map((outfit: any) => (
-                            <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                              <button 
-                                onClick={() => requestRestore(outfit.id, 'outfits')}
-                                style={cartPageStyles.restoreBtn}
-                                title="Восстановить"
-                              >
-                                ↩
-                              </button>
-                              <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
-                                <div style={outfitStyles.itemsGrid}>
-                                  {outfit.items.slice(0, 4).map((item: any, idx: number) => (
-                                    <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
-                                  ))}
+                          {deletedOutfits.map((outfit: any) => {
+                            const msLeft = (14 * 24 * 60 * 60 * 1000) - (Date.now() - new Date(outfit.deletedAt || Date.now()).getTime());
+                            const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+                            const daysWord = daysLeft % 10 === 1 && daysLeft % 100 !== 11 ? 'день' : [2, 3, 4].includes(daysLeft % 10) && ![12, 13, 14].includes(daysLeft % 100) ? 'дня' : 'дней';
+
+                            return (
+                              <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                                <span style={{
+                                  position: 'absolute', top: '10px', left: '10px',
+                                  backgroundColor: 'rgba(230, 85, 85, 0.7)', color: '#FFFFFF',
+                                  padding: '3px 8px', borderRadius: '8px', fontSize: '9px',
+                                  fontWeight: '600', zIndex: 10, fontFamily: 'Inter, sans-serif'
+                                }}>
+                                  {daysLeft} {daysWord}
+                                </span>
+                                <button 
+                                  onClick={() => requestRestore(outfit.id, 'outfits')}
+                                  style={cartPageStyles.restoreBtn}
+                                  title="Восстановить"
+                                >
+                                  ↩
+                                </button>
+                                <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
+                                  <div style={outfitStyles.itemsGrid}>
+                                    {(outfit.items || []).slice(0, 4).map((item: any, idx: number) => (
+                                      <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
+                                    ))}
+                                  </div>
                                 </div>
+                                <span style={galleryStyles.cardTitle}>{outfit.name}</span>
                               </div>
-                              <span style={galleryStyles.cardTitle}>{outfit.name}</span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -687,26 +701,40 @@ const confirmDelete = () => {
                       <div>
                         <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленная одежда</span>
                         <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
-                          {deletedClothes.map((item: any) => (
-                            <div 
-                              key={item.id} 
-                              style={{ ...galleryStyles.card, position: 'relative', cursor: 'default' }}
-                            >
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  requestRestore(item.id, 'clothes');
-                                }}
-                                style={cartPageStyles.restoreBtn}
+                          {deletedClothes.map((item: any) => {
+                            const msLeft = (14 * 24 * 60 * 60 * 1000) - (Date.now() - new Date(item.deletedAt || Date.now()).getTime());
+                            const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+                            const daysWord = daysLeft % 10 === 1 && daysLeft % 100 !== 11 ? 'день' : [2, 3, 4].includes(daysLeft % 10) && ![12, 13, 14].includes(daysLeft % 100) ? 'дня' : 'дней';
+
+                            return (
+                              <div 
+                                key={item.id} 
+                                style={{ ...galleryStyles.card, position: 'relative', cursor: 'default' }}
                               >
-                                ↩
-                              </button>
-                              <div style={galleryStyles.imageWrapper}>
-                                <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                                <span style={{
+                                  position: 'absolute', top: '10px', left: '10px',
+                                  backgroundColor: 'rgba(21, 20, 20, 0.7)', color: '#FFFFFF',
+                                  padding: '3px 8px', borderRadius: '8px', fontSize: '9px',
+                                  fontWeight: '600', zIndex: 10, fontFamily: 'Inter, sans-serif'
+                                }}>
+                                  {daysLeft} {daysWord}
+                                </span>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    requestRestore(item.id, 'clothes');
+                                  }}
+                                  style={cartPageStyles.restoreBtn}
+                                >
+                                  ↩
+                                </button>
+                                <div style={galleryStyles.imageWrapper}>
+                                  <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                                </div>
+                                <span style={galleryStyles.cardTitle}>{item.name}</span>
                               </div>
-                              <span style={galleryStyles.cardTitle}>{item.name}</span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -815,7 +843,7 @@ const confirmDelete = () => {
                 </button>
                 
                 <input 
-                  placeholder="Название аутфита" 
+                  placeholder="Название образа" 
                   value={outfitName}
                   onChange={(e) => setOutfitName(e.target.value)}
                   style={{
@@ -968,7 +996,7 @@ const confirmDelete = () => {
                     />
                     <div style={galleryStyles.confirmBox}>
                       <span style={galleryStyles.confirmText}>
-                        Добавьте хотя бы одну вещь, чтобы сохранить аутфит.
+                        Добавьте хотя бы одну вещь, чтобы сохранить образ.
                       </span>
                       <div style={{ ...galleryStyles.confirmActions, marginTop: '8px' }}>
                         <button 
@@ -1452,7 +1480,7 @@ const confirmDelete = () => {
                     setSelectedOutfitForView(null);
                   }}
                 >
-                  Удалить аутфит
+                  Удалить образ
                 </button>
               </div>
             </>
@@ -1464,7 +1492,7 @@ const confirmDelete = () => {
               <div style={galleryStyles.confirmBox}>
                 <span style={galleryStyles.confirmText}>
                   {deleteConfirm.type === 'clothes' && 'Переместить вещь в корзину?'}
-                  {deleteConfirm.type === 'outfits' && 'Переместить аутфит в корзину?'}
+                  {deleteConfirm.type === 'outfits' && 'Переместить образ в корзину?'}
                   {deleteConfirm.type === 'capsules' && 'Переместить капсулу в корзину?'}
                 </span>
                 <div style={galleryStyles.confirmActions}>
@@ -1733,7 +1761,7 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
           style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600'}} 
           onClick={() => setIsOutfitCreatorOpen(true)}
         >
-          + Создать новый аутфит
+          + Создать новый образ
         </button>
       )}
 
