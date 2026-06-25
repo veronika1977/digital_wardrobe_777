@@ -79,6 +79,7 @@ const МАТЕРИАЛЫ = [
 
 const КАТЕГОРИИ = [
   { id: "all", name: "Все" },
+  { id: "outerwear", name: "Верхняя одежда" },
   { id: "top", name: "Верх" },
   { id: "bottom", name: "Низ" },
   { id: "shoes", name: "Обувь" },
@@ -1152,6 +1153,7 @@ const confirmDelete = () => {
 
               <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
                 <option value="" disabled hidden>Категория</option>
+                <option value="outerwear">Верхняя одежда</option>
                 <option value="top">Верх</option>
                 <option value="bottom">Низ</option>
                 <option value="shoes">Обувь</option>
@@ -1213,6 +1215,18 @@ const confirmDelete = () => {
               )}
 
               <div style={drawerStyles.actionsContainer}>
+                {editingItemId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetDrawerState();
+                      haptic('light');
+                    }}
+                    style={drawerStyles.cancelBtn}
+                  >
+                    Отменить
+                  </button>
+                )}
                 <button 
                   onClick={() => {
                     if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
@@ -1550,6 +1564,7 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
             >
               <option value="" disabled hidden>Категория</option>
               <option value="">Все</option>
+              <option value="outerwear">Верхняя одежда</option>
               <option value="top">Верх</option>
               <option value="bottom">Низ</option>
               <option value="shoes">Обувь</option>
@@ -1824,7 +1839,7 @@ const navStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999,
+    zIndex: 90,
     pointerEvents: 'none',
   },
   navBar: {
