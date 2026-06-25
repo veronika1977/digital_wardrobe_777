@@ -1123,9 +1123,24 @@ const confirmDelete = () => {
 
             <div style={drawerStyles.scrollContainer}>
               {!newImage ? (
-                <PhotoPicker onImageSelected={(imgData: string) => {
-                  setNewImage(imgData);
-                }} />
+                <>
+                  <div style={{
+                    backgroundColor: '#F9F8F6',
+                    border: '1px solid rgba(21, 20, 20, 0.08)',
+                    borderRadius: '14px',
+                    padding: '12px 16px',
+                    color: '#6B6A69',
+                    fontSize: '12px',
+                    lineHeight: '1.4',
+                    textAlign: 'center',
+                    fontFamily: 'Inter, sans-serif'
+                  }}>
+                    <strong>Обратите внимание:</strong> вещь должна быть сфотографирована ровно и на однотонном (однородном) фоне.
+                  </div>
+                  <PhotoPicker onImageSelected={(imgData: string) => {
+                    setNewImage(imgData);
+                  }} />
+                </>
               ) : (
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: '20px', overflow: 'hidden' }}>
                   <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1133,45 +1148,51 @@ const confirmDelete = () => {
                 </div>
               )}
 
-              {!editingItemId && (
-                <>
-                  <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
-                    <option value="" disabled hidden>Сезон</option>
-                    {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+              <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
 
-                  <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
-                    <option value="" disabled hidden>Материал</option>
-                    {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
+                <option value="" disabled hidden>Категория</option>
+                <option value="top">Верх</option>
+                <option value="bottom">Низ</option>
+                <option value="shoes">Обувь</option>
+                <option value="accessory">Аксессуары</option>
+              </select>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', width: '100%' }}>
-                    <span style={{ fontSize: '12px', color: '#6B6A69', fontWeight: '500', paddingLeft: '4px' }}>Цвет вещи:</span>
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 2px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-                      {ЦВЕТА.map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => { setNewColor(c.id); haptic('light'); }}
-                          style={{
-                            flexShrink: 0,
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '10px',
-                            backgroundColor: c.hex,
-                            border: newColor === c.id ? '2.5px solid #151414' : c.id === 'white' ? '1px solid #D4D3D1' : 'none',
-                            boxShadow: '0px 2px 6px rgba(0,0,0,0.06)',
-                            cursor: 'pointer',
-                            transform: newColor === c.id ? 'scale(1.05)' : 'none',
-                            transition: 'all 0.1s ease'
-                          }}
-                          title={c.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
+                <option value="" disabled hidden>Сезон</option>
+                {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+
+              <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
+                <option value="" disabled hidden>Материал</option>
+                {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', width: '100%' }}>
+                <span style={{ fontSize: '12px', color: '#6B6A69', fontWeight: '500', paddingLeft: '4px' }}>Цвет вещи:</span>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 2px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                  {ЦВЕТА.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => { setNewColor(c.id); haptic('light'); }}
+                      style={{
+                        flexShrink: 0,
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        backgroundColor: c.hex,
+                        border: newColor === c.id ? '2.5px solid #151414' : c.id === 'white' ? '1px solid #D4D3D1' : 'none',
+                        boxShadow: '0px 2px 6px rgba(0,0,0,0.06)',
+                        cursor: 'pointer',
+                        transform: newColor === c.id ? 'scale(1.05)' : 'none',
+                        transition: 'all 0.1s ease'
+                      }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              </div>
               
               {drawerError && (
                 <div style={{
@@ -1196,18 +1217,23 @@ const confirmDelete = () => {
                   onClick={() => {
                     if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
                     if (!newCategory) { setDrawerError('Выберите категорию вещи'); return; }
-
-                    if (!editingItemId) {
-                      if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
-                      if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
-                      if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
-                      if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
-                    }
+                    if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
+                    if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
+                    if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
+                    if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
                     
                     if (editingItemId) {
-                      setClothes(clothes.map((item: any) => 
+                      setClothes((clothes || []).map((item: any) => 
                         item.id === editingItemId 
-                          ? { ...item, category: newCategory, img: newImage }
+                          ? { 
+                              ...item, 
+                              name: newName, 
+                              category: newCategory, 
+                              season: newSeason, 
+                              color: newColor, 
+                              material: newMaterial, 
+                              img: newImage 
+                            }
                           : item
                       ));
                     } else {
@@ -1222,13 +1248,13 @@ const confirmDelete = () => {
                         createdAt: new Date().toISOString(),
                         deletedAt: null,
                       };
-                      setClothes([newItem, ...clothes]);
+                      setClothes([newItem, ...(clothes || [])]);
                     }
 
                     resetDrawerState();
                     haptic('medium');
                     setCurrentScreen('profile'); 
-                  }} 
+                  }}  
                   style={drawerStyles.saveBtn}
                 >
                   Сохранить
@@ -1552,7 +1578,6 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
               ))}
             </select>
 
-            {/* Кастомный выпадающий список для цвета */}
             <div style={{ position: 'relative', width: '100%' }}>
               <button 
                 onClick={() => setIsColorDropdownOpen(!isColorDropdownOpen)}
