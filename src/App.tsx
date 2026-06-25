@@ -226,6 +226,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'profile' | 'cart'>('home');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
+  const [selectedOutfitForView, setSelectedOutfitForView] = useState<any | null>(null);
   const [newName, setNewName] = useState('');
   const [restoreConfirm, setRestoreConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
   const [newCategory, setNewCategory] = useState('');
@@ -249,6 +250,28 @@ function App() {
   const [pickerCategory, setPickerCategory] = useState('all');
   const [isOutfitCreatorOpen, setIsOutfitCreatorOpen] = useState(false);
   const [outfitName, setOutfitName] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
+
+  const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
+    setDeleteConfirm({ id, type });
+  };
+
+const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    const { id, type } = deleteConfirm;
+    haptic('heavy');
+    const now = new Date().toISOString();
+    if (type === 'clothes') setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
+    else if (type === 'outfits') {
+      setOutfits(outfits.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
+      setIsOutfitCreatorOpen(false);
+      setCanvasItems([]);
+      setOutfitName('');
+      setEditingOutfitId(null);
+    }
+    else if (type === 'capsules') setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
+    setDeleteConfirm(null);
+  };
 
   const getCalendarDays = () => {
     const now = new Date();
@@ -435,7 +458,12 @@ function App() {
                             <span style={outfitStyles.outfitName}>{latestOutfit.name}</span>
                             <div style={outfitStyles.itemsGrid}>
                               {latestOutfit.items.slice(0, 4).map((item: any, idx: number) => (
-                                <img key={item.id || idx} src={item.img} alt="" style={outfitStyles.gridImage} />
+                                <img 
+                                  key={`${item.id}-${idx}`}
+                                  src={item.img} 
+                                  alt="" 
+                                  style={outfitStyles.gridImage} 
+                                />
                               ))}
                             </div>
                           </div>
@@ -559,9 +587,14 @@ function App() {
                   setSelectedItemForView(item);
                   haptic('light');
                 }}
+                onOutfitClick={(outfit: any) => {
+                  setSelectedOutfitForView(outfit);
+                  haptic('light');
+                }}
                 setEditingOutfitId={setEditingOutfitId}
                 setCanvasItems={setCanvasItems}
                 setOutfitName={setOutfitName}
+                openDeleteModal={openDeleteModal}
               />
             </div>
           )}
@@ -590,13 +623,11 @@ function App() {
                 const deletedCapsules = capsules.filter((item: any) => item.deletedAt);
                 const hasDeletedItems = deletedClothes.length > 0 || deletedOutfits.length > 0 || deletedCapsules.length > 0;
 
-                // ИСПРАВЛЕНО: Теперь функция не восстанавливает сразу, а открывает модалку
                 const requestRestore = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
                   haptic('light');
                   setRestoreConfirm({ id, type });
                 };
 
-                // НОВОЕ: Функция окончательного подтверждения восстановления
                 const executeRestore = () => {
                   if (!restoreConfirm) return;
                   const { id, type } = restoreConfirm;
@@ -631,7 +662,7 @@ function App() {
                           {deletedOutfits.map((outfit: any) => (
                             <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
                               <button 
-                                onClick={() => requestRestore(outfit.id, 'outfits')} // ИСПРАВЛЕНО
+                                onClick={() => requestRestore(outfit.id, 'outfits')}
                                 style={cartPageStyles.restoreBtn}
                                 title="Восстановить"
                               >
@@ -658,13 +689,12 @@ function App() {
                           {deletedClothes.map((item: any) => (
                             <div 
                               key={item.id} 
-                              onClick={() => setSelectedItemForView(item)} 
-                              style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
+                              style={{ ...galleryStyles.card, position: 'relative', cursor: 'default' }}
                             >
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  requestRestore(item.id, 'clothes'); // ИСПРАВЛЕНО
+                                  requestRestore(item.id, 'clothes');
                                 }}
                                 style={cartPageStyles.restoreBtn}
                               >
@@ -680,7 +710,6 @@ function App() {
                       </div>
                     )}
 
-                    {/* НОВОЕ: Рендер модалки подтверждения восстановления */}
                     {restoreConfirm && (
                       <>
                         <div onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmBackdrop} />
@@ -689,7 +718,7 @@ function App() {
                           <div style={galleryStyles.confirmActions}>
                             <button 
                               onClick={executeRestore} 
-                              style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }} // Используем зеленый успех из темы
+                              style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }}
                             >
                               Да
                             </button>
@@ -744,7 +773,6 @@ function App() {
             </>
           )}
 
-          {/* ПОЛНОЭКРАННЫЙ БЕЖЕВЫЙ КОНСТРУКТОР АУТФИТОВ */}
           {isOutfitCreatorOpen && (
             <div 
               style={{
@@ -802,7 +830,10 @@ function App() {
                 />
 
                 <button 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
                     if (canvasItems.length === 0) {
                       setShowEmptyOutfitAlert(true);
                       haptic('heavy');
@@ -810,26 +841,33 @@ function App() {
                     }
 
                     if (editingOutfitId) {
-                      setOutfits(outfits.map((o: any) => 
+                      setOutfits((outfits || []).map((o: any) => 
                         o.id === editingOutfitId 
-                          ? { ...o, name: outfitName || "Мой образ", items: canvasItems } 
+                          ? { ...o, name: outfitName || "Мой образ", items: [...canvasItems] } 
                           : o
                       ));
                     } else {
-                      setOutfits([{ 
+                      const newOutfit: Outfit = { 
                         id: Date.now(), 
                         name: outfitName || "Мой образ", 
-                        items: canvasItems, 
+                        items: [...canvasItems],
                         createdAt: new Date().toISOString(), 
                         deletedAt: null 
-                      }, ...outfits]);
+                      };
+                      setOutfits([newOutfit, ...(outfits || [])]);
                     }
 
-                    setIsOutfitCreatorOpen(false); 
-                    setCanvasItems([]); 
-                    setOutfitName('');
-                    setEditingOutfitId(null);
                     haptic('medium');
+
+                    setIsOutfitCreatorOpen(false); 
+                    setCurrentScreen('profile'); 
+
+                    setTimeout(() => {
+                      setActiveDragId(null);
+                      setCanvasItems([]); 
+                      setOutfitName('');
+                      setEditingOutfitId(null);
+                    }, 50);
                   }}
                   style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#151414' }}
                 >
@@ -848,7 +886,6 @@ function App() {
                   </div>
                 )}
 
-                {/* Рендерим вещи на холсте */}
                 {canvasItems.map((item) => (
                   <div
                     key={item.id}
@@ -922,7 +959,6 @@ function App() {
                   </div>
                 ))}
 
-                {/* МОДАЛКА ПРЕДУПРЕЖДЕНИЯ (Теперь внутри правильного контекста экрана) */}
                 {showEmptyOutfitAlert && (
                   <>
                     <div 
@@ -950,7 +986,6 @@ function App() {
                 )}
               </div>
 
-              {/* Кнопка добавления вещей на холст */}
               <div style={{ padding: '20px', backgroundColor: 'transparent', display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={() => setIsItemPickerOpen(true)}
@@ -962,14 +997,13 @@ function App() {
                     borderRadius: '20px',
                     fontSize: '15px',
                     fontWeight: '600',
-                    boxShadow: '0px 8px 24px rgba(0,0,0,0.15)'
+                    boxSizing: 'border-box'
                   }}
                 >
                   + Добавить вещи на экран
                 </button>
               </div>
 
-              {/* Пикер вещей для холста */}
               {isItemPickerOpen && (
                 <div 
                   onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }}
@@ -1257,9 +1291,133 @@ function App() {
                 >
                   Редактировать
                 </button>
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#E57373',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    openDeleteModal(selectedItemForView.id, 'clothes');
+                    setSelectedItemForView(null);
+                  }}
+                >
+                  Удалить вещь
+                </button>
               </div>
             </>
           )}
+
+          {selectedOutfitForView && (
+            <>
+              <div 
+                onClick={() => setSelectedOutfitForView(null)} 
+                style={itemModalStyles.backdrop} />
+              <div style={itemModalStyles.box}>
+                <div style={itemModalStyles.header}>
+                  <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
+                  <button onClick={() => setSelectedOutfitForView(null)} style={itemModalStyles.closeBtn}>✕</button>
+                </div>
+                <div style={{ 
+                  width: '100%', 
+                  aspectRatio: '1/1', 
+                  backgroundColor: '#E6E5E3', 
+                  borderRadius: '16px', 
+                  position: 'relative', 
+                  overflow: 'hidden',
+                  border: '1px solid rgba(21, 20, 20, 0.05)'
+                }}>
+                  {(selectedOutfitForView.items || []).map((item: any, idx: number) => {
+                    const factor = 0.75; 
+                    return (
+                      <img 
+                        key={`${item.id}-${idx}`}
+                        src={item.img} 
+                        alt="" 
+                        style={{
+                          position: 'absolute',
+                          left: `${item.x * factor}px`,
+                          top: `${item.y * factor}px`,
+                          width: `${110 * factor * (item.scale || 1)}px`,
+                          height: `${110 * factor * (item.scale || 1)}px`,
+                          objectFit: 'cover',
+                          borderRadius: '12px'
+                        }} 
+                      />
+                    );
+                  })}
+                </div>
+
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#151414',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginTop: '8px'
+                  }}
+                  onClick={() => {
+                    setEditingOutfitId(selectedOutfitForView.id);
+                    setCanvasItems(selectedOutfitForView.items);
+                    setOutfitName(selectedOutfitForView.name);
+                    setIsOutfitCreatorOpen(true);
+                    setSelectedOutfitForView(null);
+                    haptic('light');
+                  }}
+                >
+                  Редактировать
+                </button>
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#E57373',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    openDeleteModal(selectedOutfitForView.id, 'outfits');
+                    setSelectedOutfitForView(null);
+                  }}
+                >
+                  Удалить аутфит
+                </button>
+              </div>
+            </>
+          )}
+          
+          {deleteConfirm && (
+            <>
+              <div onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
+              <div style={galleryStyles.confirmBox}>
+                <span style={galleryStyles.confirmText}>
+                  {deleteConfirm.type === 'clothes' && 'Переместить вещь в корзину?'}
+                  {deleteConfirm.type === 'outfits' && 'Переместить аутфит в корзину?'}
+                  {deleteConfirm.type === 'capsules' && 'Переместить капсулу в корзину?'}
+                </span>
+                <div style={galleryStyles.confirmActions}>
+                  <button onClick={confirmDelete} style={galleryStyles.confirmDeleteBtn}>Да</button>
+                  <button onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
+                </div>
+              </div>
+            </>
+          )}
+          
           <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
         </>
       )}
@@ -1268,56 +1426,44 @@ function App() {
 }
 
 const ProfileGallery = ({ 
-  clothes, setClothes, outfits, setOutfits, capsules, setCapsules, 
+  clothes = [], outfits = [], capsules = [], 
   searchQuery, setIsSearchOpen, haptic,
   setIsOutfitCreatorOpen, 
   setIsDrawerOpen,
   onItemClick,
-  setEditingOutfitId,
-  setCanvasItems,
-  setOutfitName
+  onOutfitClick,
+  openDeleteModal
 }: any) => {
   const [activeTab, setActiveTab] = useState<'capsules' | 'outfits' | 'clothes'>('clothes');
   const [capsuleSubTab, setCapsuleSubTab] = useState<'8-3' | '10-5'>('8-3');
   
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
-  const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
-    setDeleteConfirm({ id, type });
-  };
-
-  const confirmDelete = () => {
-    if (!deleteConfirm) return;
-    const { id, type } = deleteConfirm;
-    haptic('heavy');
-    const now = new Date().toISOString();
-    if (type === 'clothes') setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
-    else if (type === 'outfits') setOutfits(outfits.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
-    else if (type === 'capsules') setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
-    setDeleteConfirm(null);
-  };
-
-  const filteredClothes = clothes.filter((item: WardrobeItem) => 
+const filteredClothes = (clothes || []).filter((item: WardrobeItem) => 
+    item &&
     !item.deletedAt && 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) &&
     (selectedCategoryFilter === '' || item.category === selectedCategoryFilter) &&
     (selectedSeason === '' || item.season === selectedSeason) &&
     (selectedColor === '' || item.color === selectedColor) &&
     (selectedMaterial === '' || item.material === selectedMaterial)
   );
   
-  const filteredOutfits = outfits.filter((item: any) => !item.deletedAt && item.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const filteredCapsules = capsules 
-    ? capsules.filter((item: any) => 
-        !item.deletedAt && 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        item.subType === capsuleSubTab
-      ) 
-    : [];
+  const filteredOutfits = (outfits || []).filter((item: any) => 
+    item &&
+    !item.deletedAt && 
+    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase())
+  );
+
+  const filteredCapsules = (capsules || []).filter((item: any) => 
+    item &&
+    !item.deletedAt && 
+    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) &&
+    item.subType === capsuleSubTab
+  );
 
   return (
     <div style={{ width: '100%', marginTop: '10px' }}>
@@ -1386,14 +1532,13 @@ const ProfileGallery = ({
               {ЦВЕТА.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
-            <select  
+            <select   
               value={selectedMaterial}  
               onChange={(e) => setSelectedMaterial(e.target.value)}  
               style={galleryStyles.filterSelect}
             >
               <option value="" disabled hidden>Материал</option>
               <option value="">Все</option>
-              {/* ИСПРАВЛЕНО: заменена латинская 'M' на русскую 'М' и добавлен тип для 'm' */}
               {МАТЕРИАЛЫ.map((m: { id: string; name: string }) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
@@ -1495,15 +1640,6 @@ const ProfileGallery = ({
                 onClick={() => onItemClick(item)} 
                 style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
               >
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openDeleteModal(item.id, 'clothes');
-                  }}
-                  style={galleryStyles.deleteBadge}
-                >
-                  ✕
-                </button>
                 <div style={galleryStyles.imageWrapper}>
                   <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
                 </div>
@@ -1518,9 +1654,11 @@ const ProfileGallery = ({
         )}
 
         {activeTab === 'outfits' && filteredOutfits.map((outfit: any) => (
-          <div key={outfit.id} style={{ ...galleryStyles.card, padding: '12px' }}>
-            <button onClick={(e) => { e.stopPropagation(); openDeleteModal(outfit.id, 'outfits'); }} style={galleryStyles.deleteBadge}>✕</button>
-            
+          <div 
+            key={outfit.id} 
+            onClick={() => onOutfitClick(outfit)}
+            style={{ ...galleryStyles.card, padding: '12px', cursor: 'pointer' }}
+          >
             <div style={{ 
               width: '100%', 
               aspectRatio: '1/1', 
@@ -1530,11 +1668,11 @@ const ProfileGallery = ({
               overflow: 'hidden',
               border: '1px solid rgba(21, 20, 20, 0.05)'
             }}>
-              {outfit.items.map((item: any) => {
+              {(outfit.items || []).map((item: any, idx: number) => {
                 const factor = 0.3; 
                 return (
                   <img 
-                    key={item.id} 
+                    key={`${item.id}-${idx}`}
                     src={item.img} 
                     alt="" 
                     style={{
@@ -1550,46 +1688,10 @@ const ProfileGallery = ({
                 );
               })}
             </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-              <span style={{ ...galleryStyles.cardTitle, margin: 0, maxWidth: '70%' }}>{outfit.name}</span>
-              <button 
-                onClick={() => {
-                  setEditingOutfitId(outfit.id);
-                  setCanvasItems(outfit.items);
-                  setOutfitName(outfit.name);
-                  setIsOutfitCreatorOpen(true);
-                  haptic('light');
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  color: '#151414',
-                  fontWeight: '600'
-                }}
-              >
-                ✎
-              </button>
-            </div>
+            <span style={{ ...galleryStyles.cardTitle, marginTop: '6px' }}>{outfit.name}</span>
           </div>
         ))}
       </div>
-
-      {deleteConfirm && (
-        <>
-          <div onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
-          <div style={galleryStyles.confirmBox}>
-            <span style={galleryStyles.confirmText}>Переместить в корзину?</span>
-            <div style={galleryStyles.confirmActions}>
-              <button onClick={confirmDelete} style={galleryStyles.confirmDeleteBtn}>Да</button>
-              <button onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };
