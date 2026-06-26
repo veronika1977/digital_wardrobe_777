@@ -228,6 +228,8 @@ function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
   const [selectedOutfitForView, setSelectedOutfitForView] = useState<any | null>(null);
+  const [selectedCapsuleForView, setSelectedCapsuleForView] = useState<any | null>(null);
+  const [isViewOnlyOutfit, setIsViewOnlyOutfit] = useState<boolean>(false);
   const [newName, setNewName] = useState('');
   const [restoreConfirm, setRestoreConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
   const [newCategory, setNewCategory] = useState('');
@@ -235,6 +237,7 @@ function App() {
   const [newColor, setNewColor] = useState('');
   const [newMaterial, setNewMaterial] = useState('');
   const [showEmptyOutfitAlert, setShowEmptyOutfitAlert] = useState(false);
+  const [showEmptyCapsuleAlert, setShowEmptyCapsuleAlert] = useState(false);
   const [newImage, setNewImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [drawerError, setDrawerError] = useState<string | null>(null);
@@ -250,6 +253,19 @@ function App() {
   const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
   const [pickerCategory, setPickerCategory] = useState('all');
   const [isOutfitCreatorOpen, setIsOutfitCreatorOpen] = useState(false);
+  const [isCapsuleCreatorOpen, setIsCapsuleCreatorOpen] = useState(false);
+  const [editingCapsuleId, setEditingCapsuleId] = useState<number | null>(null);
+  const [capsuleName, setCapsuleName] = useState('');
+  const [capsuleItems, setCapsuleItems] = useState<any[]>([]);
+  const [capsulePickerCategory, setCapsulePickerCategory] = useState('all');
+  const [capsuleStep, setCapsuleStep] = useState<'items' | 'outfits'>('items');
+  const [capsuleOutfits, setCapsuleOutfits] = useState<any[]>([]);
+  const [isCapsuleOutfitCreatorOpen, setIsCapsuleOutfitCreatorOpen] = useState(false);
+  const [capsuleOutfitName, setCapsuleOutfitName] = useState('');
+  const [capsuleCanvasItems, setCapsuleCanvasItems] = useState<any[]>([]);
+  const [capsuleActiveDragId, setCapsuleActiveDragId] = useState<number | null>(null);
+  const [capsuleDragOffset, setCapsuleDragOffset] = useState({ x: 0, y: 0 });
+  const [isCapsuleOutfitItemPickerOpen, setIsCapsuleOutfitItemPickerOpen] = useState(false);
   const [outfitName, setOutfitName] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
 
@@ -262,15 +278,41 @@ const confirmDelete = () => {
     const { id, type } = deleteConfirm;
     haptic('heavy');
     const now = new Date().toISOString();
-    if (type === 'clothes') setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
-    else if (type === 'outfits') {
+    
+    if (type === 'clothes') {
+      setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
+
+      setOutfits(outfits.map((outfit: any) => {
+        if (outfit.deletedAt) return outfit;
+        const remainingItems = (outfit.items || []).filter((i: any) => i.id !== id);
+        if (remainingItems.length === 0) {
+          return { ...outfit, deletedAt: now, items: [] };
+        }
+        return { ...outfit, items: remainingItems };
+      }));
+
+      setCapsules(capsules.map((capsule: any) => {
+        if (capsule.deletedAt) return capsule;
+
+        const remainingItems = (capsule.items || []).filter((i: any) => i.id !== id);
+        
+        const remainingOutfits = (capsule.outfits || []).map((outfit: any) => {
+          const remainingOutfitItems = (outfit.items || []).filter((i: any) => i.id !== id);
+          return { ...outfit, items: remainingOutfitItems };
+        }).filter((outfit: any) => outfit.items.length > 0);
+
+        if (remainingItems.length === 0) {
+          return { ...capsule, deletedAt: now, items: [], outfits: [] };
+        }
+
+        return { ...capsule, items: remainingItems, outfits: remainingOutfits };
+      }));
+    } else if (type === 'outfits') {
       setOutfits(outfits.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
-      setIsOutfitCreatorOpen(false);
-      setCanvasItems([]);
-      setOutfitName('');
-      setEditingOutfitId(null);
+    } else if (type === 'capsules') {
+      setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
+      setIsCapsuleCreatorOpen(false);
     }
-    else if (type === 'capsules') setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: now } : item));
     setDeleteConfirm(null);
   };
 
@@ -342,6 +384,29 @@ const confirmDelete = () => {
     setActiveDragId(null);
   };
 
+  const handleCapsuleDragStart = (e: React.MouseEvent | React.TouchEvent, id: number) => {
+    haptic('light');
+    setCapsuleActiveDragId(id);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const item = capsuleCanvasItems.find(i => i.id === id);
+    if (item) {
+      setCapsuleDragOffset({ x: clientX - item.x, y: clientY - item.y });
+    }
+  };
+
+  const handleCapsuleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (capsuleActiveDragId === null) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setCapsuleCanvasItems(prev => prev.map(item => {
+      if (item.id === capsuleActiveDragId) {
+        return { ...item, x: clientX - capsuleDragOffset.x, y: clientY - capsuleDragOffset.y };
+      }
+      return item;
+    }));
+  };
+
   const resetDrawerState = () => {
     setIsDrawerOpen(false);
     setNewName('');
@@ -382,12 +447,17 @@ const confirmDelete = () => {
         font-weight: 500 !important;
       }
     `;
-    document.head.appendChild(styleTag);
-
     document.body.style.backgroundColor = '#edecea';
     document.body.style.color = '#151414';
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+    document.body.style.touchAction = 'none'; 
+    
     if (document.documentElement) {
       document.documentElement.style.backgroundColor = '#edecea';
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.height = '100vh';
     }
 
     return () => {
@@ -435,7 +505,19 @@ const confirmDelete = () => {
       {!isAuthLoading && (
         <>
           {currentScreen === 'home' && (
-            <div style={pageStyle}>
+            <div style={{ 
+              width: '100%',
+              height: '80vh', 
+              maxHeight: '100vh',
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              padding: '16px 16px 80px 16px', 
+              boxSizing: 'border-box',
+              overflow: 'hidden'
+            }}>
               <div style={headerStyles.headerContainer}>
                 <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <img 
@@ -529,7 +611,7 @@ const confirmDelete = () => {
 
               <div style={homeStyles.buttonContainer}>
                 <button 
-                  style={homeStyles.addBtn} 
+                  style={{ ...homeStyles.addBtn, fontFamily: 'Inter, sans-serif' }} 
                   onClick={() => {
                     setEditingItemId(null);
                     setIsDrawerOpen(true);
@@ -537,12 +619,22 @@ const confirmDelete = () => {
                   }}
                 >
                   <div style={homeStyles.plusCircle}>
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="1" strokeLinecap="round">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="0.8" strokeLinecap="round">
                       <line x1="12" y1="4" x2="12" y2="20"></line>
                       <line x1="4" y1="12" x2="20" y2="12"></line>
                     </svg>
                   </div>
-                  <span style={homeStyles.btnText} className="fancy-serif">ДОБАВИТЬ ВЕЩЬ</span>
+                  <span 
+                    className="fancy-serif" 
+                    style={{ 
+                      ...homeStyles.btnText, 
+                      fontFamily: "'Playfair Display', serif", 
+                      fontWeight: '430', 
+                      letterSpacing: '1.5px' 
+                    }}
+                  >
+                    ДОБАВИТЬ ВЕЩЬ
+                  </span>
                 </button>
               </div>
             </div>
@@ -584,12 +676,17 @@ const confirmDelete = () => {
                 haptic={haptic}
                 setIsOutfitCreatorOpen={setIsOutfitCreatorOpen}
                 setIsDrawerOpen={setIsDrawerOpen}
+                setIsCapsuleCreatorOpen={setIsCapsuleCreatorOpen}
                 onItemClick={(item: any) => {
                   setSelectedItemForView(item);
                   haptic('light');
                 }}
                 onOutfitClick={(outfit: any) => {
                   setSelectedOutfitForView(outfit);
+                  haptic('light');
+                }}
+                onCapsuleClick={(capsule: any) => {
+                  setSelectedCapsuleForView(capsule);
                   haptic('light');
                 }}
                 setEditingOutfitId={setEditingOutfitId}
@@ -611,7 +708,19 @@ const confirmDelete = () => {
                   />
                 </div>
                 <h1 style={{ ...headerStyles.headerTitle, marginLeft: '40px' }} className="fancy-serif">КОРЗИНА</h1>
-                <div style={{ width: '42px', height: '42px' }} />
+                <button 
+                  onClick={() => {
+                    setCurrentScreen('profile');
+                    haptic('light');
+                  }}
+                  style={{ ...headerStyles.searchBtn, backgroundColor: '#151414' }}
+                  title="Назад в гардероб"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                </button>
               </div>
 
               <div style={cartPageStyles.infoBanner}>
@@ -633,21 +742,15 @@ const confirmDelete = () => {
                   if (!restoreConfirm) return;
                   const { id, type } = restoreConfirm;
                   haptic('medium');
-
-                  if (type === 'clothes') {
-                    setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
-                  } else if (type === 'outfits') {
-                    setOutfits(outfits.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
-                  } else if (type === 'capsules') {
-                    setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
-                  }
+                  if (type === 'clothes') setClothes(clothes.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
+                  else if (type === 'outfits') setOutfits(outfits.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
+                  else if (type === 'capsules') setCapsules(capsules.map((item: any) => item.id === id ? { ...item, deletedAt: null } : item));
                   setRestoreConfirm(null);
                 };
 
                 if (!hasDeletedItems) {
                   return (
                     <div style={cartPageStyles.container}>
-                      <div style={cartPageStyles.emptyIcon}></div>
                       <span style={cartPageStyles.emptyText}>Корзина пуста</span>
                       <p style={cartPageStyles.emptySubtext}>Здесь будут отображаться удаленные вами вещи и образы.</p>
                     </div>
@@ -656,82 +759,130 @@ const confirmDelete = () => {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {deletedOutfits.length > 0 && (
-                      <div>
-                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные образы</span>
-                        <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
-                          {deletedOutfits.map((outfit: any) => {
-                            const msLeft = (14 * 24 * 60 * 60 * 1000) - (Date.now() - new Date(outfit.deletedAt || Date.now()).getTime());
-                            const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
-                            const daysWord = daysLeft % 10 === 1 && daysLeft % 100 !== 11 ? 'день' : [2, 3, 4].includes(daysLeft % 10) && ![12, 13, 14].includes(daysLeft % 100) ? 'дня' : 'дней';
-
-                            return (
-                              <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                                <span style={{
-                                  position: 'absolute', top: '10px', left: '10px',
-                                  backgroundColor: 'rgba(230, 85, 85, 0.7)', color: '#FFFFFF',
-                                  padding: '3px 8px', borderRadius: '8px', fontSize: '9px',
-                                  fontWeight: '600', zIndex: 10, fontFamily: 'Inter, sans-serif'
-                                }}>
-                                  {daysLeft} {daysWord}
-                                </span>
-                                <button 
-                                  onClick={() => requestRestore(outfit.id, 'outfits')}
-                                  style={cartPageStyles.restoreBtn}
-                                  title="Восстановить"
-                                >
-                                  ↩
-                                </button>
-                                <div style={{ ...outfitStyles.outfitCard, padding: '4px', height: '100px' }}>
-                                  <div style={outfitStyles.itemsGrid}>
-                                    {(outfit.items || []).slice(0, 4).map((item: any, idx: number) => (
-                                      <img key={item.id || idx} src={item.img} alt="" style={galleryStyles.gridImage} />
-                                    ))}
-                                  </div>
-                                </div>
-                                <span style={galleryStyles.cardTitle}>{outfit.name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
+                    {/* ВЕЩИ */}
                     {deletedClothes.length > 0 && (
                       <div>
                         <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленная одежда</span>
-                        <div style={{ ...galleryStyles.grid, marginTop: '8px' }}>
-                          {deletedClothes.map((item: any) => {
-                            const msLeft = (14 * 24 * 60 * 60 * 1000) - (Date.now() - new Date(item.deletedAt || Date.now()).getTime());
-                            const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
-                            const daysWord = daysLeft % 10 === 1 && daysLeft % 100 !== 11 ? 'день' : [2, 3, 4].includes(daysLeft % 10) && ![12, 13, 14].includes(daysLeft % 100) ? 'дня' : 'дней';
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateRows: deletedClothes.length === 1 ? '190px' : 'repeat(2, 190px)', 
+                          gridAutoFlow: 'column', 
+                          gridAutoColumns: 'calc(33.33% - 7px)', 
+                          gap: '10px', 
+                          overflowX: 'auto', 
+                          marginTop: '8px',
+                          paddingBottom: '6px',
+                          WebkitOverflowScrolling: 'touch',
+                          scrollbarWidth: 'none'
+                        }}>
+                          {deletedClothes.map((item: any) => (
+                            <div key={item.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                              <button onClick={() => requestRestore(item.id, 'clothes')} style={cartPageStyles.restoreBtn}>↩</button>
+                              <div style={galleryStyles.imageWrapper}>
+                                <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                              </div>
+                              <span style={galleryStyles.cardTitle}>{item.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ОБРАЗЫ */}
+                    {deletedOutfits.length > 0 && (
+                      <div style={{ marginTop: '16px' }}>
+                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные образы</span>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateRows: deletedOutfits.length === 1 ? '190px' : 'repeat(2, 190px)', 
+                          gridAutoFlow: 'column', 
+                          gridAutoColumns: 'calc(33.33% - 7px)', 
+                          gap: '10px', 
+                          overflowX: 'auto', 
+                          marginTop: '8px',
+                          paddingBottom: '6px',
+                          WebkitOverflowScrolling: 'touch',
+                          scrollbarWidth: 'none'
+                        }}>
+                          {deletedOutfits.map((outfit: any) => (
+                            <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                              <button onClick={() => requestRestore(outfit.id, 'outfits')} style={cartPageStyles.restoreBtn}>↩</button>
+                              <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
+                                {(outfit.items || []).map((item: any, idx: number) => {
+                                  const factor = 0.333; 
+                                  return (
+                                    <img 
+                                      key={`${item.id}-${idx}`}
+                                      src={item.img} 
+                                      alt="" 
+                                      style={{
+                                        position: 'absolute',
+                                        left: `${item.x * factor}px`,
+                                        top: `${item.y * factor}px`,
+                                        width: `${110 * factor * (item.scale || 1)}px`,
+                                        height: `${110 * factor * (item.scale || 1)}px`,
+                                        objectFit: 'cover',
+                                        borderRadius: '6px'
+                                      }} 
+                                    />
+                                  );
+                                })}
+                              </div>
+                              <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* КАПСУЛЫ */}
+                    {deletedCapsules.length > 0 && (
+                      <div style={{ marginTop: '16px' }}>
+                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные капсулы</span>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateRows: deletedCapsules.length === 1 ? '190px' : 'repeat(2, 190px)', 
+                          gridAutoFlow: 'column', 
+                          gridAutoColumns: 'calc(33.33% - 7px)', 
+                          gap: '10px', 
+                          overflowX: 'auto', 
+                          marginTop: '8px',
+                          paddingBottom: '6px',
+                          WebkitOverflowScrolling: 'touch',
+                          scrollbarWidth: 'none'
+                        }}>
+                          {deletedCapsules.map((capsule: any) => {
+                            const itemsCount = capsule.items?.length || 0;
+                            const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
 
                             return (
-                              <div 
-                                key={item.id} 
-                                style={{ ...galleryStyles.card, position: 'relative', cursor: 'default' }}
-                              >
-                                <span style={{
-                                  position: 'absolute', top: '10px', left: '10px',
-                                  backgroundColor: 'rgba(21, 20, 20, 0.7)', color: '#FFFFFF',
-                                  padding: '3px 8px', borderRadius: '8px', fontSize: '9px',
-                                  fontWeight: '600', zIndex: 10, fontFamily: 'Inter, sans-serif'
+                              <div key={capsule.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                                <button onClick={() => requestRestore(capsule.id, 'capsules')} style={cartPageStyles.restoreBtn}>↩</button>
+                                <div style={{ 
+                                  ...galleryStyles.imageWrapper, 
+                                  display: 'grid', 
+                                  gridTemplateColumns: `repeat(${columns}, 1fr)`, 
+                                  gap: '4px', 
+                                  padding: '4px', 
+                                  boxSizing: 'border-box',
+                                  alignContent: 'center'
                                 }}>
-                                  {daysLeft} {daysWord}
-                                </span>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    requestRestore(item.id, 'clothes');
-                                  }}
-                                  style={cartPageStyles.restoreBtn}
-                                >
-                                  ↩
-                                </button>
-                                <div style={galleryStyles.imageWrapper}>
-                                  <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                                  {capsule.items && capsule.items.map((item: any, idx: number) => (
+                                    <img 
+                                      key={item.id || idx} 
+                                      src={item.img} 
+                                      style={{
+                                        width: '100%',
+                                        aspectRatio: '1/1',
+                                        objectFit: 'cover',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#edecea'
+                                      }} 
+                                      alt="" 
+                                    />
+                                  ))}
                                 </div>
-                                <span style={galleryStyles.cardTitle}>{item.name}</span>
+                                <span style={galleryStyles.cardTitle}>{capsule.name}</span>
                               </div>
                             );
                           })}
@@ -739,21 +890,15 @@ const confirmDelete = () => {
                       </div>
                     )}
 
+                    {/* ПОДТВЕРЖДЕНИЕ ВОССТАНОВЛЕНИЯ */}
                     {restoreConfirm && (
                       <>
                         <div onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmBackdrop} />
                         <div style={galleryStyles.confirmBox}>
-                          <span style={galleryStyles.confirmText}>Восстановить этот элемент из корзины?</span>
+                          <span style={galleryStyles.confirmText}>Восстановить из корзины?</span>
                           <div style={galleryStyles.confirmActions}>
-                            <button 
-                              onClick={executeRestore} 
-                              style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }}
-                            >
-                              Да
-                            </button>
-                            <button onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmCancelBtn}>
-                              Отмена
-                            </button>
+                            <button onClick={executeRestore} style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }}>Да</button>
+                            <button onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
                           </div>
                         </div>
                       </>
@@ -887,7 +1032,6 @@ const confirmDelete = () => {
                     }
 
                     haptic('medium');
-
                     setIsOutfitCreatorOpen(false); 
                     setCurrentScreen('profile'); 
 
@@ -904,116 +1048,113 @@ const confirmDelete = () => {
                 </button>
               </div>
 
-              <div style={{ flex: 1, position: 'relative', width: '100%', overflow: 'hidden' }}>
-                {canvasItems.length === 0 && (
-                  <div style={{
-                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                    color: '#8B8A89', textAlign: 'center', pointerEvents: 'none', width: '80%'
-                  }}>
-                    <p className="fancy-serif" style={{ fontSize: '18px', margin: '0 0 8px 0' }}>Ваш будущий образ</p>
-                    <p style={{ fontSize: '13px', margin: 0 }}>Нажмите «+ Добавить вещи» снизу, чтобы выложить их сюда, и двигайте пальцем</p>
-                  </div>
-                )}
-
-                {canvasItems.map((item) => (
-                  <div
-                    key={item.id}
-                    onMouseDown={(e) => handleDragStart(e, item.id)}
-                    onTouchStart={(e) => handleDragStart(e, item.id)}
-                    style={{
-                      position: 'absolute',
-                      left: `${item.x}px`,
-                      top: `${item.y}px`,
-                      transform: `scale(${item.scale})`,
-                      transformOrigin: 'center center',
-                      cursor: 'move',
-                      touchAction: 'none',
-                      userSelect: 'none',
-                      zIndex: activeDragId === item.id ? 1000 : 10
-                    }}
-                  >
-                    <button
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCanvasItems(canvasItems.filter(i => i.id !== item.id));
-                        haptic('light');
-                      }}
-                      style={{
-                        position: 'absolute', top: '-8px', right: '-8px',
-                        width: '20px', height: '20px', borderRadius: '50%',
-                        backgroundColor: '#151414', color: '#fff', border: 'none',
-                        fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        zIndex: 15, cursor: 'pointer'
-                      }}
-                    >
-                      ✕
-                    </button>
-
-                    <img 
-                      src={item.img} 
-                      alt="" 
-                      draggable="false"
-                      style={{
-                        width: '110px',
-                        aspectRatio: '1/1',
-                        objectFit: 'cover',
-                        borderRadius: '16px',
-                        boxShadow: activeDragId === item.id ? '0px 12px 24px rgba(0,0,0,0.15)' : '0px 4px 12px rgba(0,0,0,0.06)',
-                        backgroundColor: '#fff',
-                        border: '1px solid rgba(0,0,0,0.02)',
-                        transition: 'box-shadow 0.1s ease'
-                      }} 
-                    />
-
-                    <div 
-                      onTouchStart={(e) => e.stopPropagation()}
-                      style={{
-                        display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '6px'
-                      }}
-                    >
-                      <button 
-                        onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.max(0.5, i.scale - 0.15) } : i))}
-                        style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
-                      >
-                        -
-                      </button>
-                      <button 
-                        onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.min(2, i.scale + 0.15) } : i))}
-                        style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
-                      >
-                        +
-                      </button>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
+                <div style={{ width: '315px', height: '480px', backgroundColor: '#E6E5E3', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0px 8px 32px rgba(0,0,0,0.05)', border: '1px solid rgba(21, 20, 20, 0.03)' }}>
+                  {canvasItems.length === 0 && (
+                    <div style={{
+                      position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                      color: '#8B8A89', textAlign: 'center', pointerEvents: 'none', width: '80%'
+                    }}>
+                      <p className="fancy-serif" style={{ fontSize: '16px', margin: '0 0 6px 0' }}>Ваш будущий образ</p>
+                      <p style={{ fontSize: '12px', margin: 0 }}>Нажмите «+ Добавить вещи» снизу, чтобы выложить их сюда, и двигайте пальцем</p>
                     </div>
-                  </div>
-                ))}
+                  )}
 
-                {showEmptyOutfitAlert && (
-                  <>
-                    <div 
-                      onClick={() => setShowEmptyOutfitAlert(false)} 
-                      style={galleryStyles.confirmBackdrop} 
-                    />
-                    <div style={galleryStyles.confirmBox}>
-                      <span style={galleryStyles.confirmText}>
-                        Добавьте хотя бы одну вещь, чтобы сохранить образ.
-                      </span>
-                      <div style={{ ...galleryStyles.confirmActions, marginTop: '8px' }}>
+                  {canvasItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onMouseDown={(e) => handleDragStart(e, item.id)}
+                      onTouchStart={(e) => handleDragStart(e, item.id)}
+                      style={{
+                        position: 'absolute',
+                        left: `${item.x}px`,
+                        top: `${item.y}px`,
+                        transform: `scale(${item.scale})`,
+                        transformOrigin: 'center center',
+                        cursor: 'move',
+                        touchAction: 'none',
+                        userSelect: 'none',
+                        zIndex: activeDragId === item.id ? 1000 : 10
+                      }}
+                    >
+                      <button
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCanvasItems(canvasItems.filter(i => i.id !== item.id));
+                          haptic('light');
+                        }}
+                        style={{
+                          position: 'absolute', top: '-8px', right: '-8px',
+                          width: '20px', height: '20px', borderRadius: '50%',
+                          backgroundColor: '#151414', color: '#fff', border: 'none',
+                          fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          zIndex: 15, cursor: 'pointer'
+                        }}
+                      >
+                        ✕
+                      </button>
+
+                      <img 
+                        src={item.img} 
+                        alt="" 
+                        draggable="false"
+                        style={{
+                          width: '110px',
+                          aspectRatio: '1/1',
+                          objectFit: 'cover',
+                          borderRadius: '16px',
+                          boxShadow: activeDragId === item.id ? '0px 12px 24px rgba(0,0,0,0.15)' : '0px 4px 12px rgba(0,0,0,0.06)',
+                          backgroundColor: '#fff',
+                          border: '1px solid rgba(0,0,0,0.02)',
+                          transition: 'box-shadow 0.1s ease'
+                        }} 
+                      />
+
+                      <div 
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={{
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '6px', 
+                          position: 'absolute', 
+                          left: '-28px', 
+                          top: '50%', 
+                          transform: 'translateY(-50%)'
+                        }}
+                      >
                         <button 
-                          onClick={() => setShowEmptyOutfitAlert(false)} 
-                          style={{ 
-                            ...galleryStyles.confirmDeleteBtn, 
-                            backgroundColor: '#151414',
-                            padding: '12px' 
-                          }}
+                          onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.max(0.5, i.scale - 0.15) } : i))}
+                          style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
                         >
-                          Понятно
+                          -
+                        </button>
+                        <button 
+                          onClick={() => setCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.min(2, i.scale + 0.15) } : i))}
+                          style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                        >
+                          +
                         </button>
                       </div>
                     </div>
-                  </>
-                )}
+                  ))}
+                </div>
               </div>
+
+              {showEmptyOutfitAlert && (
+                <>
+                  <div onClick={() => setShowEmptyOutfitAlert(false)} style={galleryStyles.confirmBackdrop} />
+                  <div style={galleryStyles.confirmBox}>
+                    <span style={galleryStyles.confirmText}>Добавьте хотя бы одну вещь, чтобы сохранить образ.</span>
+                    <div style={{ ...galleryStyles.confirmActions, marginTop: '8px' }}>
+                      <button onClick={() => setShowEmptyOutfitAlert(false)} style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#151414', padding: '12px' }}>
+                        Понятно
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div style={{ padding: '20px', backgroundColor: 'transparent', display: 'flex', justifyContent: 'center' }}>
                 <button
@@ -1032,48 +1173,174 @@ const confirmDelete = () => {
                   + Добавить вещи на экран
                 </button>
               </div>
+            </div>
+          )}
 
-              {isItemPickerOpen && (
-                <div 
-                  onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }}
-                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
+          {isItemPickerOpen && (
+          <div 
+            onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
+          >
+            <div 
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: '70vh',
+                backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px',
+                display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
+              }}
+            >
+              {/* ЗАГОЛОВОК С КНОПКОЙ ГОТОВО ВМЕСТО КРЕСТИКА */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontWeight: '600', fontSize: '16px' }}>Выберите вещи</span>
+                <button 
+                  onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }} 
+                  style={{ background: 'none', border: 'none', fontSize: '15px', fontWeight: '600', color: '#151414', cursor: 'pointer' }}
                 >
-                  <div 
-                    onClick={e => e.stopPropagation()}
+                  Готово
+                </button>
+              </div>
+
+              {/* Категории */}
+              
+              <div style={{ display: 'flex', gap: '8px', paddingBottom: '12px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
+                {КАТЕГОРИИ.map((cat) => (
+                  <button 
+                    key={cat.id}
+                    onClick={() => { setPickerCategory(cat.id); haptic('light'); }}
                     style={{
-                      position: 'absolute', bottom: 0, left: 0, right: 0, height: '70vh',
-                      backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px',
-                      display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
+                      padding: '6px 12px', borderRadius: '20px', border: 'none',
+                      backgroundColor: pickerCategory === cat.id ? '#151414' : '#E6E5E3',
+                      color: pickerCategory === cat.id ? '#FFFFFF' : '#151414',
+                      fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <span style={{ fontWeight: '600', fontSize: '16px' }}>Выберите вещи</span>
-                      <button onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }} style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>✕</button>
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+                
+              <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
+                {clothes
+                  .filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory))
+                  .map((item: any) => {
+                      const isAlreadyOnCanvas = canvasItems.some(i => i.id === item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (isAlreadyOnCanvas) {
+                              setCanvasItems(canvasItems.filter(i => i.id !== item.id));
+                            } else {
+                              setCanvasItems([...canvasItems, { 
+                                ...item, 
+                                x: 102, 
+                                y: 185, 
+                                scale: 1 
+                              }]);
+                              haptic('light');
+                            }
+                          }}
+                          style={{
+                            aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative',
+                            border: isAlreadyOnCanvas ? '3px solid #151414' : '1px solid #E6E5E3',
+                            opacity: isAlreadyOnCanvas ? 0.6 : 1,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                          {isAlreadyOnCanvas && (
+                            <div style={{
+                              position: 'absolute', top: '4px', right: '4px', backgroundColor: '#151414',
+                              color: '#fff', borderRadius: '50%', width: '18px', height: '18px',
+                              fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>✓</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  
+                  {clothes.filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory)).length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8B8A89', fontSize: '13px', paddingTop: '40px' }}>
+                      В этой категории пока нет вещей
                     </div>
-                    
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '8px', 
-                      paddingBottom: '12px', 
-                      overflowX: 'auto', 
-                      flexShrink: 0, 
-                      WebkitOverflowScrolling: 'touch',
-                      scrollbarWidth: 'none'
-                    }}>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCapsuleCreatorOpen && (
+            <div 
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: '#edecea', zIndex: 99999,
+                display: 'flex', flexDirection: 'column', overflow: 'hidden'
+              }}
+            >
+              {capsuleStep === 'items' && (
+                <>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px',
+                    backgroundColor: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)',
+                    borderBottom: '1px solid rgba(21, 20, 20, 0.05)'
+                  }}>
+                    <button 
+                      onClick={() => { 
+                        setIsCapsuleCreatorOpen(false); 
+                        setCapsuleItems([]); 
+                        setCapsuleName(''); 
+                        setCapsuleOutfits([]);
+                        setEditingCapsuleId(null);
+                      }}
+                      style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '500', color: '#6B6A69' }}
+                    >
+                      Отмена
+                    </button>
+                    <input 
+                      placeholder="Название капсулы" 
+                      value={capsuleName}
+                      onChange={(e) => setCapsuleName(e.target.value)}
+                      style={{
+                        background: 'none', border: 'none', borderBottom: '1px solid #151414',
+                        textAlign: 'center', fontSize: '16px', fontWeight: '600', outline: 'none', width: '50%'
+                      }}
+                    />
+                    <button 
+                      onClick={() => {
+                        if (capsuleItems.length === 0) { 
+                          setShowEmptyCapsuleAlert(true); 
+                          haptic('heavy'); 
+                          return; 
+                        }
+                        setCapsuleStep('outfits');
+                        haptic('light');
+                      }}
+                      style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#151414' }}
+                    >
+                      Далее →
+                    </button>
+                  </div>
+
+                  <div style={{
+                    flex: 1,
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    boxSizing: 'border-box',
+                    padding: '16px 16px 0 16px',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Переключатель категорий */}
+                    <div style={{ display: 'flex', gap: '8px', paddingBottom: '14px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
                       {КАТЕГОРИИ.map((cat) => (
                         <button 
                           key={cat.id}
-                          onClick={() => { setPickerCategory(cat.id); haptic('light'); }}
+                          onClick={() => { setCapsulePickerCategory(cat.id); haptic('light'); }}
                           style={{
-                            padding: '6px 12px',
-                            borderRadius: '20px',
-                            border: 'none',
-                            backgroundColor: pickerCategory === cat.id ? '#151414' : '#E6E5E3',
-                            color: pickerCategory === cat.id ? '#FFFFFF' : '#151414',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap'
+                            padding: '8px 16px', borderRadius: '20px', border: 'none',
+                            backgroundColor: capsulePickerCategory === cat.id ? '#151414' : '#FFFFFF',
+                            color: capsulePickerCategory === cat.id ? '#FFFFFF' : '#151414',
+                            fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap',
+                            boxShadow: '0px 2px 8px rgba(0,0,0,0.02)'
                           }}
                         >
                           {cat.name}
@@ -1081,207 +1348,491 @@ const confirmDelete = () => {
                       ))}
                     </div>
                     
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
-                      {clothes
-                        .filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory))
+                    {/* Полоска выбранных вещей */}
+                    {capsuleItems.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', flexShrink: 0 }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#8B8A89', textTransform: 'uppercase', letterSpacing: '0.5px', paddingLeft: '4px' }}>
+                          Выбрано ({capsuleItems.length})
+                        </span>
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '8px', 
+                          overflowX: 'auto', 
+                          paddingTop: '8px', // Добавили отступ сверху, чтобы крестик не срезался лентой
+                          paddingLeft: '4px',
+                          paddingRight: '8px',
+                          paddingBottom: '4px', 
+                          scrollbarWidth: 'none', 
+                          WebkitOverflowScrolling: 'touch' 
+                        }}>
+                          {capsuleItems.map((item) => (
+                            <div 
+                              key={`selected-${item.id}`}
+                              onClick={() => {
+                                setCapsuleItems(capsuleItems.filter(i => i.id !== item.id));
+                                haptic('light');
+                              }}
+                              style={{
+                                flexShrink: 0,
+                                width: '60px',
+                                height: '85px',
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '10px',
+                                padding: '4px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                position: 'relative',
+                                overflow: 'visible', // Разрешаем крестику вылезать за пределы карточки
+                                boxShadow: '0px 2px 6px rgba(0,0,0,0.03)',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <div style={{ width: '100%', height: '62px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E6E5E3' }}>
+                                <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                              </div>
+                              <span style={{ fontSize: '9px', fontWeight: '500', color: '#151414', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', paddingLeft: '1px' }}>
+                                {item.name}
+                              </span>
+                              <div style={{
+                                position: 'absolute', 
+                                top: '-5px', 
+                                right: '-5px', 
+                                backgroundColor: '#E57373',
+                                color: '#fff', 
+                                borderRadius: '50%', 
+                                width: '16px', 
+                                height: '14px', // Оставили 14 для идеального выравнивания по вертикали
+                                paddingBottom: '2px', // Центрируем сам символ '✕' внутри кружочка
+                                fontSize: '8px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                fontWeight: 'bold',
+                                boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+                                boxSizing: 'border-box',
+                                zIndex: 10
+                              }}>✕</div>
+                            </div>
+                          ))}
+                        </div>
+                        <hr style={{ border: 'none', borderTop: '1px solid rgba(21, 20, 20, 0.05)', margin: '4px 0 0 0' }} />
+                      </div>
+                    )}
+                    
+                    {/* Сетка вещей с мгновенным выбором */}
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '40px', scrollbarWidth: 'none' }}>
+                      {(clothes || [])
+                        .filter((item: any) => !item.deletedAt && (capsulePickerCategory === 'all' || item.category === capsulePickerCategory))
                         .map((item: any) => {
-                          const isAlreadyOnCanvas = canvasItems.some(i => i.id === item.id);
+                          const isAlreadyInCapsule = capsuleItems.some(i => i.id === item.id);
                           return (
                             <div
                               key={item.id}
                               onClick={() => {
-                                if (isAlreadyOnCanvas) {
-                                  setCanvasItems(canvasItems.filter(i => i.id !== item.id));
+                                if (isAlreadyInCapsule) {
+                                  setCapsuleItems(capsuleItems.filter(i => i.id !== item.id));
                                 } else {
-                                  setCanvasItems([...canvasItems, { 
-                                    ...item, 
-                                    x: window.innerWidth / 2 - 55, 
-                                    y: window.innerHeight / 3, 
-                                    scale: 1 
-                                  }]);
+                                  setCapsuleItems([...capsuleItems, item]);
                                   haptic('light');
                                 }
                               }}
                               style={{
-                                aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative',
-                                border: isAlreadyOnCanvas ? '3px solid #151414' : '1px solid #E6E5E3',
-                                opacity: isAlreadyOnCanvas ? 0.6 : 1,
-                                cursor: 'pointer'
+                                ...galleryStyles.card,
+                                position: 'relative',
+                                cursor: 'pointer',
+                                border: isAlreadyInCapsule ? '3px solid #151414' : '1px solid transparent',
+                                opacity: isAlreadyInCapsule ? 0.75 : 1,
+                                transition: 'all 0.1s ease'
                               }}
                             >
-                              <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                              {isAlreadyOnCanvas && (
+                              <div style={galleryStyles.imageWrapper}>
+                                <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                              </div>
+                              <span style={galleryStyles.cardTitle}>{item.name}</span>
+                              {isAlreadyInCapsule && (
                                 <div style={{
-                                  position: 'absolute', top: '4px', right: '4px', backgroundColor: '#151414',
-                                  color: '#fff', borderRadius: '50%', width: '18px', height: '18px',
-                                  fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                  position: 'absolute', top: '10px', right: '10px', backgroundColor: '#151414',
+                                  color: '#fff', borderRadius: '50%', width: '20px', height: '20px',
+                                  fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
+                                  zIndex: 5
                                 }}>✓</div>
                               )}
                             </div>
                           );
                         })}
-                      
-                      {clothes.filter((item: any) => !item.deletedAt && (pickerCategory === 'all' || item.category === pickerCategory)).length === 0 && (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8B8A89', fontSize: '13px', paddingTop: '40px' }}>
+                      {(clothes || []).filter((item: any) => !item.deletedAt && (capsulePickerCategory === 'all' || item.category === capsulePickerCategory)).length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8B8A89', fontSize: '14px', paddingTop: '60px' }}>
                           В этой категории пока нет вещей
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isDrawerOpen && (
-            <div onClick={resetDrawerState} style={drawerStyles.backdrop} />
-          )}
-
-          <div style={{ ...drawerStyles.drawer, display: isDrawerOpen ? 'flex' : 'none' }}>
-            <div style={drawerStyles.header}>
-              <div style={drawerStyles.headerLeft}>
-                <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>
-                  {editingItemId ? '✎' : '+'}
-                </span>
-                <h3 style={drawerStyles.headerTitle}>
-                  {editingItemId ? 'Редактировать вещь' : 'Новая вещь'}
-                </h3>
-              </div>
-              <button onClick={resetDrawerState} style={drawerStyles.closeBtn}>✕</button>
-            </div>
-
-            <div style={drawerStyles.scrollContainer}>
-              {!newImage ? (
-                <>
-                  <div style={{
-                    backgroundColor: '#F9F8F6',
-                    border: '1px solid rgba(21, 20, 20, 0.08)',
-                    borderRadius: '14px',
-                    padding: '12px 16px',
-                    color: '#6B6A69',
-                    fontSize: '12px',
-                    lineHeight: '1.4',
-                    textAlign: 'center',
-                    fontFamily: 'Inter, sans-serif'
-                  }}>
-                    <strong>Обратите внимание:</strong> вещь должна быть сфотографирована ровно и на однотонном (однородном) фоне.
-                  </div>
-                  <PhotoPicker onImageSelected={(imgData: string) => {
-                    setNewImage(imgData);
-                  }} />
                 </>
-              ) : (
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: '20px', overflow: 'hidden' }}>
-                  <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(21, 20, 20, 0.8)', color: '#FFFFFF', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Заменить фото</button>
-                </div>
               )}
 
-              <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
-
-              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled hidden>Категория</option>
-                <option value="outerwear">Верхняя одежда</option>
-                <option value="top">Верх</option>
-                <option value="bottom">Низ</option>
-                <option value="shoes">Обувь</option>
-                <option value="accessory">Аксессуары</option>
-              </select>
-
-              <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled hidden>Сезон</option>
-                {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-
-              <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
-                <option value="" disabled hidden>Материал</option>
-                {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', width: '100%' }}>
-                <span style={{ fontSize: '12px', color: '#6B6A69', fontWeight: '500', paddingLeft: '4px' }}>Цвет вещи:</span>
-                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 2px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-                  {ЦВЕТА.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => { setNewColor(c.id); haptic('light'); }}
-                      style={{
-                        flexShrink: 0,
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '10px',
-                        backgroundColor: c.hex,
-                        border: newColor === c.id ? '2.5px solid #151414' : c.id === 'white' ? '1px solid #D4D3D1' : 'none',
-                        boxShadow: '0px 2px 6px rgba(0,0,0,0.06)',
-                        cursor: 'pointer',
-                        transform: newColor === c.id ? 'scale(1.05)' : 'none',
-                        transition: 'all 0.1s ease'
+            {capsuleStep === 'outfits' && (
+              <>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px',
+                  backgroundColor: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)',
+                  borderBottom: '1px solid rgba(21, 20, 20, 0.05)'
+                }}>
+                  <button 
+                    onClick={() => setCapsuleStep('items')}
+                    style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '500', color: '#6B6A69' }}
+                  >
+                    ← К вещам
+                  </button>
+                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Образы капсулы</span>
+                  <button 
+                    onClick={() => {
+                        if (editingCapsuleId) {
+                          setCapsules((capsules || []).map((c: any) =>
+                            c.id === editingCapsuleId
+                              ? { ...c, name: capsuleName || "Моя капсула", items: [...capsuleItems], outfits: [...capsuleOutfits] }
+                              : c
+                          ));
+                        } else {
+                          const newCapsule = {
+                            id: Date.now(),
+                            name: capsuleName || "Моя капсула",
+                            items: [...capsuleItems],
+                            outfits: [...capsuleOutfits],
+                            createdAt: new Date().toISOString(),
+                            deletedAt: null
+                          };
+                          setCapsules([newCapsule, ...(capsules || [])]);
+                        }
+                        
+                        haptic('medium');
+                        setIsCapsuleCreatorOpen(false);
+                        setCapsuleItems([]);
+                        setCapsuleName('');
+                        setCapsuleOutfits([]);
+                        setCapsuleStep('items');
+                        setEditingCapsuleId(null); // Сбрасываем ID редактирования
                       }}
-                      title={c.name}
-                    />
-                  ))}
+                    style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#6B6A69' }}
+                  >
+                    Сохранить
+                  </button>
                 </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                  <span style={outfitStyles.sectionTitle} className="fancy-serif">
+                    {editingCapsuleId ? 'Изменение образов капсулы' : 'Шаг 2: Создайте образы внутри капсулы'}
+                  </span>
+                  {capsuleOutfits.length === 0 ? (
+                    <div style={{ color: '#8B8A89', textAlign: 'center', marginTop: '30%', width: '100%' }}>
+                      <p style={{ fontSize: '13px' }}>Пока нет образов. Создайте первый образ из вещей этой капсулы!</p>
+                    </div>
+                  ) : (
+                    <div style={{ ...galleryStyles.grid, marginTop: '12px' }}>
+                      {capsuleOutfits.map((outfit) => (
+                        <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                          <button onClick={() => setCapsuleOutfits(capsuleOutfits.filter(o => o.id !== outfit.id))} style={galleryStyles.deleteBadge}>✕</button>
+                          <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
+                            {(outfit.items || []).map((item: any, idx: number) => {
+                              const factor = 0.333; 
+                              return (
+                                <img 
+                                  key={`${item.id}-${idx}`}
+                                  src={item.img} 
+                                  alt="" 
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${item.x * factor}px`,
+                                    top: `${item.y * factor}px`,
+                                    width: `${110 * factor * (item.scale || 1)}px`,
+                                    height: `${110 * factor * (item.scale || 1)}px`,
+                                    objectFit: 'cover',
+                                    borderRadius: '6px'
+                                  }} 
+                                />
+                              );
+                            })}
+                          </div>
+                          <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ padding: '20px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => setIsCapsuleOutfitCreatorOpen(true)}
+                    style={{ padding: '16px 32px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '20px', fontSize: '15px', fontWeight: '600' }}
+                  >
+                    + Создать образ из капсулы
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ПОД-КОНСТРУКТОР ОБРАЗА ДЛЯ КАПСУЛЫ (ИЗОЛИРОВАННЫЙ ХОЛСТ) */}
+        {isCapsuleOutfitCreatorOpen && (
+          <div 
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#edecea', zIndex: 100001, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            onMouseMove={handleCapsuleDragMove} onTouchMove={handleCapsuleDragMove}
+            onMouseUp={() => setCapsuleActiveDragId(null)} onTouchEnd={() => setCapsuleActiveDragId(null)}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)' }}>
+              <button onClick={() => { setIsCapsuleOutfitCreatorOpen(false); setCapsuleCanvasItems([]); setCapsuleOutfitName(''); }} style={{ background: 'none', border: 'none', fontSize: '16px', color: '#6B6A69' }}>Отмена</button>
+              <input placeholder="Название образа" value={capsuleOutfitName} onChange={(e) => setCapsuleOutfitName(e.target.value)} style={{ background: 'none', border: 'none', borderBottom: '1px solid #151414', textAlign: 'center', fontSize: '16px', fontWeight: '600', outline: 'none', width: '50%' }} />
+              <button 
+                onClick={() => {
+                  if (capsuleCanvasItems.length === 0) { alert('Добавьте вещи на холст!'); return; }
+                  const newCapsuleOutfit = { id: Date.now(), name: capsuleOutfitName || "Образ капсулы", items: [...capsuleCanvasItems] };
+                  setCapsuleOutfits([newCapsuleOutfit, ...capsuleOutfits]);
+                  setIsCapsuleOutfitCreatorOpen(false);
+                  setCapsuleCanvasItems([]);
+                  setCapsuleOutfitName('');
+                  haptic('medium');
+                }}
+                style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#151414' }}
+              >
+                Готово
+              </button>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
+                <div style={{ width: '280px', height: '370px', backgroundColor: '#E6E5E3', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0px 8px 32px rgba(0,0,0,0.05)', border: '1px solid rgba(21, 20, 20, 0.03)' }}>                {capsuleCanvasItems.length === 0 && (
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#8B8A89', textAlign: 'center', width: '80%', pointerEvents: 'none' }}>
+                    <p className="fancy-serif" style={{ fontSize: '16px' }}>Используются только вещи из этой капсулы</p>
+                  </div>
+                )}
+                {capsuleCanvasItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onMouseDown={(e) => handleCapsuleDragStart(e, item.id)} onTouchStart={(e) => handleCapsuleDragStart(e, item.id)}
+                    style={{ position: 'absolute', left: `${item.x}px`, top: `${item.y}px`, transform: `scale(${item.scale || 1})`, transformOrigin: 'center center', cursor: 'move', touchAction: 'none', zIndex: capsuleActiveDragId === item.id ? 1000 : 10 }}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); setCapsuleCanvasItems(capsuleCanvasItems.filter(i => i.id !== item.id)); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#151414', color: '#fff', border: 'none', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                    <img src={item.img} draggable="false" style={{ width: '110px', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '16px', backgroundColor: '#fff', boxShadow: '0px 4px 12px rgba(0,0,0,0.06)' }} alt="" />
+                    <div 
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '6px', 
+                        position: 'absolute', 
+                        left: '-28px', 
+                        top: '50%', 
+                        transform: 'translateY(-50%)' 
+                      }}
+                    >
+                      <button onClick={(e) => { e.stopPropagation(); setCapsuleCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.max(0.5, (i.scale || 1) - 0.15) } : i)); }} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}>-</button>
+                      <button onClick={(e) => { e.stopPropagation(); setCapsuleCanvasItems(prev => prev.map(i => i.id === item.id ? { ...i, scale: Math.min(2, (i.scale || 1) + 0.15) } : i)); }} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', backgroundColor: '#fff', fontSize: '12px', fontWeight: 'bold' }}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'center' }}>
+              <button onClick={() => setIsCapsuleOutfitItemPickerOpen(true)} style={{ padding: '16px 32px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '20px', fontSize: '15px', fontWeight: '600' }}>
+                + Добавить вещи из капсулы
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isCapsuleOutfitItemPickerOpen && (
+          <div onClick={() => setIsCapsuleOutfitItemPickerOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002 }}>
+            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60vh', backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontWeight: '600', fontSize: '16px' }}>Вещи в этой капсуле</span>
+                <button 
+                  onClick={() => setIsCapsuleOutfitItemPickerOpen(false)} 
+                  style={{ background: 'none', border: 'none', fontSize: '15px', fontWeight: '600', color: '#151414', cursor: 'pointer' }}
+                >
+                  Готово
+                </button>
               </div>
               
-              {drawerError && (
-                <div style={{
-                  backgroundColor: '#FFF0F0',
-                  border: '1px solid #E57373',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  color: '#E57373',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  textAlign: 'center',
-                  fontFamily: 'Inter, sans-serif',
-                  marginTop: '4px',
-                  animation: 'fadeIn 0.2s ease'
-                }}>
-                  {drawerError}
-                </div>
-              )}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {capsuleItems.map((item) => {
+                  const isAlreadyOnCanvas = capsuleCanvasItems.some(i => i.id === item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        if (isAlreadyOnCanvas) {
+                          setCapsuleCanvasItems(capsuleCanvasItems.filter(i => i.id !== item.id));
+                        } else {
+                          setCapsuleCanvasItems([...capsuleCanvasItems, { ...item, x: 102, y: 185, scale: 1 }]);                        }
+                      }}
+                      style={{ aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative', border: isAlreadyOnCanvas ? '3px solid #151414' : '1px solid #E6E5E3', opacity: isAlreadyOnCanvas ? 0.6 : 1, cursor: 'pointer' }}
+                    >
+                      <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      {isAlreadyOnCanvas && <div style={{ position: 'absolute', top: '4px', right: '4px', backgroundColor: '#151414', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
-              <div style={drawerStyles.actionsContainer}>
-                {editingItemId && (
+        {isDrawerOpen && (
+          <div onClick={resetDrawerState} style={drawerStyles.backdrop} />
+        )}
+
+        <div style={{ ...drawerStyles.drawer, display: isDrawerOpen ? 'flex' : 'none' }}>
+          <div style={drawerStyles.header}>
+            <div style={drawerStyles.headerLeft}>
+              <span style={{ fontSize: '20px', color: '#151414', fontWeight: 'bold', marginRight: '6px' }}>
+                {editingItemId ? '✎' : '+'}
+              </span>
+              <h3 style={drawerStyles.headerTitle}>
+                {editingItemId ? 'Редактировать вещь' : 'Новая вещь'}
+              </h3>
+            </div>
+            <button onClick={resetDrawerState} style={drawerStyles.closeBtn}>✕</button>
+          </div>
+
+          <div style={drawerStyles.scrollContainer}>
+            {!newImage ? (
+              <>
+                <div style={{
+                  backgroundColor: '#F9F8F6',
+                  border: '1px solid rgba(21, 20, 20, 0.08)',
+                  borderRadius: '14px',
+                  padding: '12px 16px',
+                  color: '#6B6A69',
+                  fontSize: '12px',
+                  lineHeight: '1.4',
+                  textAlign: 'center',
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  <strong>Обратите внимание:</strong> вещь должна быть сфотографирована ровно и на однотонном (однородном) фоне.
+                </div>
+                <PhotoPicker onImageSelected={(imgData: string) => {
+                  setNewImage(imgData);
+                }} />
+              </>
+            ) : (
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', borderRadius: '20px', overflow: 'hidden' }}>
+                <img src={newImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button onClick={() => setNewImage(null)} style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(21, 20, 20, 0.8)', color: '#FFFFFF', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Заменить фото</button>
+              </div>
+            )}
+
+            <input type="text" placeholder="Название вещи" value={newName} onChange={(e) => setNewName(e.target.value)} style={drawerStyles.input} />
+
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={drawerStyles.select}>
+              <option value="" disabled hidden>Категория</option>
+              <option value="outerwear">Верхняя одежда</option>
+              <option value="top">Верх</option>
+              <option value="bottom">Низ</option>
+              <option value="shoes">Обувь</option>
+              <option value="accessory">Аксессуары</option>
+            </select>
+
+            <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)} style={drawerStyles.select}>
+              <option value="" disabled hidden>Сезон</option>
+              {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+
+            <select value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} style={drawerStyles.select}>
+              <option value="" disabled hidden>Материал</option>
+              {МАТЕРИАЛЫ.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', width: '100%' }}>
+              <span style={{ fontSize: '12px', color: '#6B6A69', fontWeight: '500', paddingLeft: '4px' }}>Цвет вещи:</span>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 2px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                {ЦВЕТА.map(c => (
                   <button
+                    key={c.id}
                     type="button"
-                    onClick={() => {
-                      resetDrawerState();
-                      haptic('light');
+                    onClick={() => { setNewColor(c.id); haptic('light'); }}
+                    style={{
+                      flexShrink: 0,
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      backgroundColor: c.hex,
+                      border: newColor === c.id ? '2.5px solid #151414' : c.id === 'white' ? '1px solid #D4D3D1' : 'none',
+                      boxShadow: '0px 2px 6px rgba(0,0,0,0.06)',
+                      cursor: 'pointer',
+                      transform: newColor === c.id ? 'scale(1.05)' : 'none',
+                      transition: 'all 0.1s ease'
                     }}
-                    style={drawerStyles.cancelBtn}
-                  >
-                    Отменить
-                  </button>
-                )}
-                <button 
+                    title={c.name}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {drawerError && (
+              <div style={{
+                backgroundColor: '#FFF0F0',
+                border: '1px solid #E57373',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                color: '#E57373',
+                fontSize: '13px',
+                fontWeight: '500',
+                textAlign: 'center',
+                fontFamily: 'Inter, sans-serif',
+                marginTop: '4px',
+                animation: 'fadeIn 0.2s ease'
+              }}>
+                {drawerError}
+              </div>
+            )}
+
+            <div style={drawerStyles.actionsContainer}>
+              {editingItemId && (
+                <button
+                  type="button"
                   onClick={() => {
-                    if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
-                    if (!newCategory) { setDrawerError('Выберите категорию вещи'); return; }
-                    if (!newName.trim()) { setDrawerError('Введите название вещи'); return; }
-                    if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
-                    if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
-                    if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
-                    
+                    resetDrawerState();
+                    haptic('light');
+                  }}
+                  style={drawerStyles.cancelBtn}
+                >
+                  Отменить
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (!newImage) { setDrawerError('Добавьте фотографию вещи'); return; }
+                  if (!newName.trim()) { setDrawerError('Введите название вещи'); return; } // Теперь проверяется раньше категории!
+                  if (!newCategory) { setDrawerError('Выберите категорию вещи'); return; }
+                  if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
+                  if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
+                  if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
+                  
+                  try {
                     if (editingItemId) {
-                      setClothes((clothes || []).map((item: any) => 
-                        item.id === editingItemId 
-                          ? { 
-                              ...item, 
-                              name: newName, 
-                              category: newCategory, 
-                              season: newSeason, 
-                              color: newColor, 
-                              material: newMaterial, 
-                              img: newImage 
-                            }
-                          : item
-                      ));
+                      setClothes((prevClothes: any) => {
+                        const arr = Array.isArray(prevClothes) ? prevClothes : [];
+                        return arr.map((item: any) => 
+                          item && item.id === editingItemId 
+                            ? { 
+                                ...item, 
+                                name: newName || "Без названия", 
+                                category: newCategory, 
+                                season: newSeason, 
+                                color: newColor, 
+                                material: newMaterial, 
+                                img: newImage 
+                              }
+                            : item
+                        );
+                      });
                     } else {
                       const newItem = {
                         id: Date.now(),
-                        name: newName,
+                        name: newName || "Без названия",
                         category: newCategory,
                         season: newSeason,
                         color: newColor,
@@ -1290,220 +1841,434 @@ const confirmDelete = () => {
                         createdAt: new Date().toISOString(),
                         deletedAt: null,
                       };
-                      setClothes([newItem, ...(clothes || [])]);
+                      setClothes((prevClothes: any) => {
+                        const arr = Array.isArray(prevClothes) ? prevClothes : [];
+                        return [newItem, ...arr];
+                      });
                     }
+                  } catch (e) {
+                    console.error("Ошибка при сохранении вещи в стейт:", e);
+                    setDrawerError("Ошибка локального хранилища. Попробуйте еще раз.");
+                    return;
+                  }
 
-                    resetDrawerState();
-                    haptic('medium');
-                    setCurrentScreen('profile'); 
-                  }}  
-                  style={drawerStyles.saveBtn}
+                  resetDrawerState();
+                  haptic('medium');
+                  setCurrentScreen('profile');
+                }}  
+                style={drawerStyles.saveBtn}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {selectedItemForView && (
+          <>
+            <div 
+              onClick={() => setSelectedItemForView(null)} 
+              style={itemModalStyles.backdrop} />
+            <div style={itemModalStyles.box}>
+              <div style={itemModalStyles.header}>
+                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedItemForView.name}</h3>
+                <button onClick={() => setSelectedItemForView(null)} style={itemModalStyles.closeBtn}>✕</button>
+              </div>
+              <div style={itemModalStyles.imageContainer}>
+                <img src={selectedItemForView.img} alt="" style={itemModalStyles.image} />
+              </div>
+              <div style={itemModalStyles.tagsContainer}>
+                <div style={itemModalStyles.tagRow}>
+                  <span style={itemModalStyles.tagLabel}>Сезон:</span>
+                  <span style={itemModalStyles.tagBadge}>
+                    {СЕЗОНЫ.find(s => s.id === selectedItemForView.season)?.name || selectedItemForView.season}
+                  </span>
+                </div>
+                <div style={itemModalStyles.tagRow}>
+                  <span style={itemModalStyles.tagLabel}>Цвет:</span>
+                  <div 
+                    style={{
+                      width: '45px',
+                      height: '14px',
+                      borderRadius: '6px',
+                      backgroundColor: ЦВЕТА.find(c => c.id === selectedItemForView.color)?.hex || '#8B8A89',
+                      border: selectedItemForView.color === 'white' ? '1px solid #D4D3D1' : 'none',
+                      boxShadow: '0px 1px 3px rgba(0,0,0,0.05)'
+                    }} 
+                    title={ЦВЕТА.find(c => c.id === selectedItemForView.color)?.name || selectedItemForView.color}
+                  />
+                </div>
+                <div style={itemModalStyles.tagRow}>
+                  <span style={itemModalStyles.tagLabel}>Материал:</span>
+                  <span style={itemModalStyles.tagBadge}>
+                    {МАТЕРИАЛЫ.find(m => m.id === selectedItemForView.material)?.name || selectedItemForView.material}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#151414',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginTop: '8px'
+                }}
+                onClick={() => {
+                  setEditingItemId(selectedItemForView.id);
+                  setNewName(selectedItemForView.name);
+                  setNewCategory(selectedItemForView.category);
+                  setNewSeason(selectedItemForView.season);
+                  setNewColor(selectedItemForView.color);
+                  setNewMaterial(selectedItemForView.material);
+                  setNewImage(selectedItemForView.img);
+                  
+                  setSelectedItemForView(null);
+                  setIsDrawerOpen(true);
+                  haptic('light');
+                }}
+              >
+                Редактировать
+              </button>
+              <button
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#E57373',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  openDeleteModal(selectedItemForView.id, 'clothes');
+                  setSelectedItemForView(null);
+                }}
+              >
+                Удалить вещь
+              </button>
+            </div>
+          </>
+        )}
+
+        {selectedOutfitForView && (
+          <>
+            <div 
+              onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} 
+              style={itemModalStyles.backdrop} />
+            <div style={itemModalStyles.box}>
+              <div style={itemModalStyles.header}>
+                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
+                <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
+              </div>
+              <div style={{ 
+                width: '100%', 
+                aspectRatio: '1/1', 
+                backgroundColor: '#E6E5E3', 
+                borderRadius: '16px', 
+                position: 'relative', 
+                overflow: 'hidden',
+                border: '1px solid rgba(21, 20, 20, 0.05)'
+              }}>
+                {(selectedOutfitForView.items || []).map((item: any, idx: number) => {
+                  const factor = 0.75; 
+                  return (
+                    <img 
+                      key={`${item.id}-${idx}`}
+                      src={item.img} 
+                      alt="" 
+                      style={{
+                        position: 'absolute',
+                        left: `${item.x * factor}px`,
+                        top: `${item.y * factor}px`,
+                        width: `${110 * factor * (item.scale || 1)}px`,
+                        height: `${110 * factor * (item.scale || 1)}px`,
+                        objectFit: 'cover',
+                        borderRadius: '12px'
+                      }} 
+                    />
+                  );
+                })}
+              </div>
+
+              {!isViewOnlyOutfit && (
+                <>
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: '#151414',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      marginTop: '8px'
+                    }}
+                    onClick={() => {
+                      setEditingOutfitId(selectedOutfitForView.id);
+                      setCanvasItems(selectedOutfitForView.items);
+                      setOutfitName(selectedOutfitForView.name);
+                      setIsOutfitCreatorOpen(true);
+                      setSelectedOutfitForView(null);
+                      haptic('light');
+                    }}
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: '#E57373',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      openDeleteModal(selectedOutfitForView.id, 'outfits');
+                      setSelectedOutfitForView(null);
+                    }}
+                  >
+                    Удалить образ
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+        
+        {selectedCapsuleForView && (
+          <>
+            <div 
+              onClick={() => setSelectedCapsuleForView(null)} 
+              style={{ ...itemModalStyles.backdrop, zIndex: 99998 }} 
+            />
+            <div style={{ ...itemModalStyles.box, zIndex: 99999, maxWidth: '360px', maxHeight: '80vh', overflowY: 'auto' }}>
+              
+              {/* Шапка */}
+              <div style={itemModalStyles.header}>
+                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedCapsuleForView.name}</h3>
+                <button onClick={() => setSelectedCapsuleForView(null)} style={itemModalStyles.closeBtn}>✕</button>
+              </div>
+
+              {/* Образы */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#151414', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Образы этой капсулы</span>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', maxHeight: '410px', overflowY: 'auto', paddingRight: '2px' }}>
+                  {selectedCapsuleForView.outfits && selectedCapsuleForView.outfits.length > 0 ? (
+                    selectedCapsuleForView.outfits.map((outfit: any) => (
+                      <div 
+                        key={outfit.id} 
+                        onClick={() => {
+                          setSelectedOutfitForView(outfit);
+                          setIsViewOnlyOutfit(true);
+                          haptic('light');
+                        }}
+                        style={{ ...galleryStyles.card, cursor: 'pointer' }}
+                      >
+                        <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
+                          {(outfit.items || []).map((item: any, idx: number) => {
+                            const factor = 0.333; 
+                            return (
+                              <img 
+                                key={`${item.id}-${idx}`}
+                                src={item.img} 
+                                alt="" 
+                                style={{
+                                  position: 'absolute',
+                                  left: `${item.x * factor}px`,
+                                  top: `${item.y * factor}px`,
+                                  width: `${110 * factor * (item.scale || 1)}px`,
+                                  height: `${110 * factor * (item.scale || 1)}px`,
+                                  objectFit: 'cover',
+                                  borderRadius: '6px'
+                                }} 
+                              />
+                            );
+                          })}
+                        </div>
+                        <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8B8A89', fontSize: '13px', padding: '30px 0' }}>
+                      В этой капсуле ещё нет созданных образов
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <hr style={{ border: 'none', borderTop: '1px solid rgba(21, 20, 20, 0.08)', margin: '12px 0' }} />
+
+              {/* Вещи */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#151414', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Вещи в капсуле ({selectedCapsuleForView.items?.length || 0})</span>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                  {selectedCapsuleForView.items?.map((item: any) => (
+                    <div key={item.id} style={{ flexShrink: 0, width: '65px', height: '65px', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#E6E5E3', border: '1px solid rgba(21,20,20,0.05)' }}>
+                      <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Кнопки управления */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '14px', width: '100%' }}>
+                <button
+                  style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                  onClick={() => {
+                    setEditingCapsuleId(selectedCapsuleForView.id);
+                    setCapsuleName(selectedCapsuleForView.name);
+                    setCapsuleItems(selectedCapsuleForView.items || []);
+                    setCapsuleOutfits(selectedCapsuleForView.outfits || []);
+                    setCapsuleStep('items');
+                    setSelectedCapsuleForView(null);
+                    setIsCapsuleCreatorOpen(true);
+                    haptic('light');
+                  }}
                 >
-                  Сохранить
+                  Редактировать капсулу
+                </button>
+                <button
+                  style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                  onClick={() => {
+                    openDeleteModal(selectedCapsuleForView.id, 'capsules');
+                    setSelectedCapsuleForView(null);
+                  }}
+                >
+                  Удалить капсулу
                 </button>
               </div>
             </div>
-          </div>
+          </>
+        )}
 
-          {selectedItemForView && (
-            <>
-              <div 
-                onClick={() => setSelectedItemForView(null)} 
-                style={itemModalStyles.backdrop} />
-              <div style={itemModalStyles.box}>
-                <div style={itemModalStyles.header}>
-                  <h3 style={itemModalStyles.title} className="fancy-serif">{selectedItemForView.name}</h3>
-                  <button onClick={() => setSelectedItemForView(null)} style={itemModalStyles.closeBtn}>✕</button>
-                </div>
-                <div style={itemModalStyles.imageContainer}>
-                  <img src={selectedItemForView.img} alt="" style={itemModalStyles.image} />
-                </div>
-                <div style={itemModalStyles.tagsContainer}>
-                  <div style={itemModalStyles.tagRow}>
-                    <span style={itemModalStyles.tagLabel}>Сезон:</span>
-                    <span style={itemModalStyles.tagBadge}>
-                      {СЕЗОНЫ.find(s => s.id === selectedItemForView.season)?.name || selectedItemForView.season}
-                    </span>
-                  </div>
-                  <div style={itemModalStyles.tagRow}>
-                    <span style={itemModalStyles.tagLabel}>Цвет:</span>
-                    <div 
+        {deleteConfirm && (
+          <>
+            <div onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
+            <div style={galleryStyles.confirmBox}>
+              <span style={galleryStyles.confirmText}>
+                {deleteConfirm.type === 'clothes' && (
+                  (() => {
+                    const isUsed = outfits.some((o: any) => !o.deletedAt && (o.items || []).some((i: any) => i.id === deleteConfirm.id)) ||
+                                   capsules.some((c: any) => !c.deletedAt && ((c.items || []).some((i: any) => i.id === deleteConfirm.id) || (c.outfits || []).some((o: any) => (o.items || []).some((i: any) => i.id === deleteConfirm.id))));
+                    return isUsed 
+                      ? 'Предупреждение: Эта вещь используется в ваших образах или капсулах. При удалении она исчезнет из них, а пустые образы/капсулы удалятся тоже. Переместить в корзину?' 
+                      : 'Переместить вещь в корзину?';
+                  })()
+                )}
+                {deleteConfirm.type === 'outfits' && 'Переместить образ в корзину?'}
+                {deleteConfirm.type === 'capsules' && 'Переместить капсулу в корзину?'}
+              </span>
+              <div style={galleryStyles.confirmActions}>
+                <button onClick={confirmDelete} style={galleryStyles.confirmDeleteBtn}>Да</button>
+                <button onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {showEmptyCapsuleAlert && (
+          <>
+            <div onClick={() => setShowEmptyCapsuleAlert(false)} style={{ ...galleryStyles.confirmBackdrop, zIndex: 100002 }} />
+            <div style={{ ...galleryStyles.confirmBox, zIndex: 100003 }}>
+              <span style={galleryStyles.confirmText}>Добавьте хотя бы одну вещь, чтобы продолжить создание капсулы.</span>
+              <div style={{ ...galleryStyles.confirmActions, marginTop: '8px' }}>
+                <button onClick={() => setShowEmptyCapsuleAlert(false)} style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#151414', padding: '12px' }}>
+                  Понятно
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {selectedOutfitForView && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100000 }}>
+            <div 
+              onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} 
+              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)' }} 
+            />
+            <div style={{ ...itemModalStyles.box, zIndex: 100001 }}>
+              <div style={itemModalStyles.header}>
+                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
+                <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
+              </div>
+              
+              <div style={{ 
+                width: '240px', 
+                height: '365px', 
+                backgroundColor: '#E6E5E3', 
+                borderRadius: '16px', 
+                position: 'relative', 
+                overflow: 'hidden',
+                margin: '0 auto',
+                border: '1px solid rgba(21, 20, 20, 0.05)'
+              }}>
+                {(selectedOutfitForView.items || []).map((item: any, idx: number) => {
+                  const factor = 0.76; 
+                  return (
+                    <img 
+                      key={`${item.id}-${idx}`}
+                      src={item.img} 
+                      alt="" 
                       style={{
-                        width: '45px',
-                        height: '14px',
-                        borderRadius: '6px',
-                        backgroundColor: ЦВЕТА.find(c => c.id === selectedItemForView.color)?.hex || '#8B8A89',
-                        border: selectedItemForView.color === 'white' ? '1px solid #D4D3D1' : 'none',
-                        boxShadow: '0px 1px 3px rgba(0,0,0,0.05)'
+                        position: 'absolute',
+                        left: `${item.x * factor}px`,
+                        top: `${item.y * factor}px`,
+                        width: `${110 * factor * (item.scale || 1)}px`,
+                        height: `${110 * factor * (item.scale || 1)}px`,
+                        objectFit: 'cover',
+                        borderRadius: '12px'
                       }} 
-                      title={ЦВЕТА.find(c => c.id === selectedItemForView.color)?.name || selectedItemForView.color}
                     />
-                  </div>
-                  <div style={itemModalStyles.tagRow}>
-                    <span style={itemModalStyles.tagLabel}>Материал:</span>
-                    <span style={itemModalStyles.tagBadge}>
-                      {МАТЕРИАЛЫ.find(m => m.id === selectedItemForView.material)?.name || selectedItemForView.material}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#151414',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    marginTop: '8px'
-                  }}
-                  onClick={() => {
-                    setEditingItemId(selectedItemForView.id);
-                    setNewName(selectedItemForView.name);
-                    setNewCategory(selectedItemForView.category);
-                    setNewSeason(selectedItemForView.season);
-                    setNewColor(selectedItemForView.color);
-                    setNewMaterial(selectedItemForView.material);
-                    setNewImage(selectedItemForView.img);
-                    
-                    setSelectedItemForView(null);
-                    setIsDrawerOpen(true);
-                    haptic('light');
-                  }}
-                >
-                  Редактировать
-                </button>
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#E57373',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    openDeleteModal(selectedItemForView.id, 'clothes');
-                    setSelectedItemForView(null);
-                  }}
-                >
-                  Удалить вещь
-                </button>
+                  );
+                })}
               </div>
-            </>
-          )}
 
-          {selectedOutfitForView && (
-            <>
-              <div 
-                onClick={() => setSelectedOutfitForView(null)} 
-                style={itemModalStyles.backdrop} />
-              <div style={itemModalStyles.box}>
-                <div style={itemModalStyles.header}>
-                  <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
-                  <button onClick={() => setSelectedOutfitForView(null)} style={itemModalStyles.closeBtn}>✕</button>
+              {!isViewOnlyOutfit && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                  <button
+                    style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                    onClick={() => {
+                      setEditingOutfitId(selectedOutfitForView.id);
+                      setCanvasItems(selectedOutfitForView.items);
+                      setOutfitName(selectedOutfitForView.name);
+                      setIsOutfitCreatorOpen(true);
+                      setSelectedOutfitForView(null);
+                      haptic('light');
+                    }}
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                    onClick={() => {
+                      openDeleteModal(selectedOutfitForView.id, 'outfits');
+                      setSelectedOutfitForView(null);
+                    }}
+                  >
+                    Удалить образ
+                  </button>
                 </div>
-                <div style={{ 
-                  width: '100%', 
-                  aspectRatio: '1/1', 
-                  backgroundColor: '#E6E5E3', 
-                  borderRadius: '16px', 
-                  position: 'relative', 
-                  overflow: 'hidden',
-                  border: '1px solid rgba(21, 20, 20, 0.05)'
-                }}>
-                  {(selectedOutfitForView.items || []).map((item: any, idx: number) => {
-                    const factor = 0.75; 
-                    return (
-                      <img 
-                        key={`${item.id}-${idx}`}
-                        src={item.img} 
-                        alt="" 
-                        style={{
-                          position: 'absolute',
-                          left: `${item.x * factor}px`,
-                          top: `${item.y * factor}px`,
-                          width: `${110 * factor * (item.scale || 1)}px`,
-                          height: `${110 * factor * (item.scale || 1)}px`,
-                          objectFit: 'cover',
-                          borderRadius: '12px'
-                        }} 
-                      />
-                    );
-                  })}
-                </div>
-
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#151414',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    marginTop: '8px'
-                  }}
-                  onClick={() => {
-                    setEditingOutfitId(selectedOutfitForView.id);
-                    setCanvasItems(selectedOutfitForView.items);
-                    setOutfitName(selectedOutfitForView.name);
-                    setIsOutfitCreatorOpen(true);
-                    setSelectedOutfitForView(null);
-                    haptic('light');
-                  }}
-                >
-                  Редактировать
-                </button>
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#E57373',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    openDeleteModal(selectedOutfitForView.id, 'outfits');
-                    setSelectedOutfitForView(null);
-                  }}
-                >
-                  Удалить образ
-                </button>
-              </div>
-            </>
-          )}
-          
-          {deleteConfirm && (
-            <>
-              <div onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
-              <div style={galleryStyles.confirmBox}>
-                <span style={galleryStyles.confirmText}>
-                  {deleteConfirm.type === 'clothes' && 'Переместить вещь в корзину?'}
-                  {deleteConfirm.type === 'outfits' && 'Переместить образ в корзину?'}
-                  {deleteConfirm.type === 'capsules' && 'Переместить капсулу в корзину?'}
-                </span>
-                <div style={galleryStyles.confirmActions}>
-                  <button onClick={confirmDelete} style={galleryStyles.confirmDeleteBtn}>Да</button>
-                  <button onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
-                </div>
-              </div>
-            </>
-          )}
-          
-          <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
+              )}
+            </div>
+          </div>
+        )}
+      
+        <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
         </>
       )}
     </div>
@@ -1514,13 +2279,14 @@ const ProfileGallery = ({
   clothes = [], outfits = [], capsules = [], 
   searchQuery, setIsSearchOpen, haptic,
   setIsOutfitCreatorOpen, 
+  setIsCapsuleCreatorOpen,
   setIsDrawerOpen,
   onItemClick,
   onOutfitClick,
-  openDeleteModal
+  onCapsuleClick,
+
 }: any) => {
   const [activeTab, setActiveTab] = useState<'capsules' | 'outfits' | 'clothes'>('clothes');
-  const [capsuleSubTab, setCapsuleSubTab] = useState<'8-3' | '10-5'>('8-3');
   
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -1528,10 +2294,13 @@ const ProfileGallery = ({
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState<boolean>(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
-const filteredClothes = (clothes || []).filter((item: WardrobeItem) => 
+  const clothesArray = Array.isArray(clothes) ? clothes : [];
+  const filteredClothes = clothesArray.filter((item: any) => 
     item &&
+    typeof item === 'object' &&
     !item.deletedAt && 
-    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) &&
+    typeof item.name === 'string' &&
+    item.name.toLowerCase().includes((searchQuery || "").toLowerCase()) &&
     (selectedCategoryFilter === '' || item.category === selectedCategoryFilter) &&
     (selectedSeason === '' || item.season === selectedSeason) &&
     (selectedColor === '' || item.color === selectedColor) &&
@@ -1547,14 +2316,13 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
   const filteredCapsules = (capsules || []).filter((item: any) => 
     item &&
     !item.deletedAt && 
-    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) &&
-    item.subType === capsuleSubTab
+    (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase())
   );
 
   return (
     <div style={{ width: '100%', marginTop: '10px' }}>
       <div style={galleryStyles.tabsContainer}>
-        {[ { id: 'capsules', label: 'Капсулы' }, { id: 'outfits', label: 'Аутфиты' }, { id: 'clothes', label: 'Одежда' } ].map((tab) => (
+        {[ { id: 'capsules', label: 'Капсулы' }, { id: 'outfits', label: 'Образы' }, { id: 'clothes', label: 'Одежда' } ].map((tab) => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); haptic('light'); }} style={{ ...galleryStyles.tabButton, color: activeTab === tab.id ? '#151414' : '#8B8A89', borderBottom: activeTab === tab.id ? '2px solid #151414' : '2px solid transparent' }}>
             {tab.label}
           </button>
@@ -1716,76 +2484,74 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
       )}
       
       {activeTab === 'capsules' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button
-            onClick={() => { setCapsuleSubTab('8-3'); haptic('light'); }}
-            style={{
-              flex: 1,
-              padding: '10px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: capsuleSubTab === '8-3' ? '#151414' : '#FFFFFF',
-              color: capsuleSubTab === '8-3' ? '#FFFFFF' : '#151414',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
-              transition: 'all 0.2s ease'
-            }}
+        <>
+          <button 
+            style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600', fontSize: '13px', cursor: 'pointer'}} 
+            onClick={() => { setIsCapsuleCreatorOpen(true); haptic('light'); }}
           >
-            Капсулы 8-3
+            + Создать новую капсулу
           </button>
-          <button
-            onClick={() => { setCapsuleSubTab('10-5'); haptic('light'); }}
-            style={{
-              flex: 1,
-              padding: '10px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: capsuleSubTab === '10-5' ? '#151414' : '#FFFFFF',
-              color: capsuleSubTab === '10-5' ? '#FFFFFF' : '#151414',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Капсулы 10-5
-          </button>
-        </div>
+          <div style={galleryStyles.itemCount}>
+            Всего капсул: {filteredCapsules.length}
+          </div>
+        </>
       )}
 
       {activeTab === 'outfits' && (
-        <button 
-          style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600'}} 
-          onClick={() => setIsOutfitCreatorOpen(true)}
-        >
-          + Создать новый образ
-        </button>
-      )}
-
-      {activeTab === 'capsules' && (
-        <button 
-          style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600', fontSize: '13px'}} 
-          onClick={() => alert(`Тут будет логика создания для капсулы ${capsuleSubTab}`)}
-        >
-          + Создать капсулу {capsuleSubTab}
-        </button>
+        <>
+          <button 
+            style={{width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '14px', border: 'none', backgroundColor: '#151414', color: '#FFFFFF', fontWeight: '600', cursor: 'pointer'}} 
+            onClick={() => { setIsOutfitCreatorOpen(true); haptic('light'); }}
+          >
+            + Создать новый образ
+          </button>
+          <div style={galleryStyles.itemCount}>
+            Всего образов: {filteredOutfits.length}
+          </div>
+        </>
       )}
 
       <div style={galleryStyles.grid} className="profile-grid">
-        {activeTab === 'capsules' && filteredCapsules.map((capsule: any) => (
-          <div key={capsule.id} style={galleryStyles.card}>
-            <button onClick={(e) => { e.stopPropagation(); openDeleteModal(capsule.id, 'capsules'); }} style={galleryStyles.deleteBadge}>✕</button>
-            <div style={galleryStyles.outfitPreviewGrid}>
-              {capsule.items && capsule.items.slice(0, 4).map((item: any, idx: number) => (
-                <img key={item.id || idx} src={item.img} style={galleryStyles.gridImage} alt="" />
-              ))}
-            </div>
-            <span style={galleryStyles.cardTitle}>{capsule.name}</span>
-          </div>
-        ))}
+        {activeTab === 'capsules' && (
+          filteredCapsules.length > 0 ? (
+            filteredCapsules.map((capsule: any) => {
+              const itemsCount = capsule.items?.length || 0;
+              const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
+
+              return (
+                <div key={capsule.id} onClick={() => onCapsuleClick(capsule)} style={{ ...galleryStyles.card, cursor: 'pointer' }}>
+                  <div style={{ 
+                    ...galleryStyles.imageWrapper, 
+                    display: 'grid', 
+                    gridTemplateColumns: `repeat(${columns}, 1fr)`, 
+                    gap: '4px', 
+                    padding: '4px', 
+                    boxSizing: 'border-box',
+                    alignContent: 'center'
+                  }}>
+                    {capsule.items && capsule.items.map((item: any, idx: number) => (
+                      <img 
+                        key={item.id || idx} 
+                        src={item.img} 
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1/1',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          backgroundColor: '#edecea'
+                        }} 
+                        alt="" 
+                      />
+                    ))}
+                  </div>
+                  <span style={galleryStyles.cardTitle}>{capsule.name}</span>
+                </div>
+              );
+            })
+          ) : (
+            <div style={galleryStyles.emptyState}>Создайте свою первую капсулу!</div>
+          )
+        )}
 
         {activeTab === 'clothes' && (
           filteredClothes.length > 0 ? (
@@ -1803,28 +2569,22 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
             ))
           ) : (
             <div style={galleryStyles.emptyState}>
-              {searchQuery.trim() !== '' ? 'Ничего не найдено по этому запросу' : 'Гардероб пуст. Сначала добавьте вещи'}
+              {searchQuery.trim() !== '' ? 'Ничего не найдено по этому запросу' : 'Добавьте свою первую вещь!'}
             </div>
           )
         )}
 
-        {activeTab === 'outfits' && filteredOutfits.map((outfit: any) => (
+        {activeTab === 'outfits' && (
+          filteredOutfits.length > 0 ? (
+            filteredOutfits.map((outfit: any) => (
           <div 
             key={outfit.id} 
             onClick={() => onOutfitClick(outfit)}
-            style={{ ...galleryStyles.card, padding: '12px', cursor: 'pointer' }}
+            style={{ ...galleryStyles.card, cursor: 'pointer' }}
           >
-            <div style={{ 
-              width: '100%', 
-              aspectRatio: '1/1', 
-              backgroundColor: '#E6E5E3', 
-              borderRadius: '12px', 
-              position: 'relative', 
-              overflow: 'hidden',
-              border: '1px solid rgba(21, 20, 20, 0.05)'
-            }}>
+            <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
               {(outfit.items || []).map((item: any, idx: number) => {
-                const factor = 0.3; 
+                const factor = 0.333; 
                 return (
                   <img 
                     key={`${item.id}-${idx}`}
@@ -1843,9 +2603,13 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
                 );
               })}
             </div>
-            <span style={{ ...galleryStyles.cardTitle, marginTop: '6px' }}>{outfit.name}</span>
+            <span style={galleryStyles.cardTitle}>{outfit.name}</span>
           </div>
-        ))}
+        ))
+          ) : (
+            <div style={galleryStyles.emptyState}>Создайте свой первый образ!</div>
+          )
+        )}
       </div>
     </div>
   );
@@ -1853,9 +2617,11 @@ const filteredClothes = (clothes || []).filter((item: WardrobeItem) =>
 
 const pageStyle: React.CSSProperties = {
   width: '100%',
-  minHeight: '100vh',
+  height: '100vh',
   padding: '16px 16px 120px 16px',
   boxSizing: 'border-box',
+  overflowY: 'auto', // Теперь скроллится только контент внутри, не дергая страницу!
+  WebkitOverflowScrolling: 'touch',
 };
 
 const navStyles: Record<string, React.CSSProperties> = {
@@ -2105,39 +2871,39 @@ const outfitStyles: Record<string, React.CSSProperties> = {
   mainRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr', 
-    gridTemplateRows: '140px 170px', 
-    gap: '12px', 
+    gridTemplateRows: '120px 145px', // Уменьшили высоту строк (было 140px и 170px)
+    gap: '10px', 
     width: '100%',
     boxSizing: 'border-box',
   },
   outfitCard: {
     gridRow: '1 / span 2', 
     backgroundColor: '#FFFFFF',
-    borderRadius: '24px',
-    padding: '16px',
+    borderRadius: '20px', // Чуть уменьшили скругление для компактности
+    padding: '12px',      // Уменьшили внутренние отступы
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
   },
   outfitName: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '500',
     color: '#6B6A69',
-    marginBottom: '12px',
+    marginBottom: '8px',
     display: 'block',
   },
   itemsGrid: {
     flex: 1,
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '8px',
+    gap: '6px',
     alignItems: 'center',
   },
   emptyGrid: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    borderRadius: '16px',
+    borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2147,7 +2913,7 @@ const outfitStyles: Record<string, React.CSSProperties> = {
     width: '100%',
     aspectRatio: '1/1',
     objectFit: 'cover',
-    borderRadius: '12px',
+    borderRadius: '10px',
     backgroundColor: '#E6E5E3',
   },
 };
@@ -2158,7 +2924,7 @@ const homeStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: '85px',
+    paddingTop: '0px',
     boxSizing: 'border-box',
   },
   addBtn: {
@@ -2194,7 +2960,7 @@ const widgetStyles: Record<string, React.CSSProperties> = {
   weatherCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: '20px',
-    padding: '12px 14px',
+    padding: '10px 12px', // Сжали отступы
     color: '#151414',
     display: 'flex',
     flexDirection: 'column',
@@ -2208,29 +2974,29 @@ const widgetStyles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     marginTop: 'auto',
     borderTop: '0.5px solid rgba(21, 20, 20, 0.12)',
-    paddingTop: '8px',
+    paddingTop: '6px',
   },
   weatherCity: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: '600',
     opacity: 0.9,
   },
   weatherTemp: {
-    fontSize: '32px',
+    fontSize: '26px', // Уменьшили размер температуры (было 32px)
     fontWeight: '700',
-    margin: '6px 0',
+    margin: '2px 0',
   },
   hourItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    fontSize: '9px',
+    fontSize: '8.5px',
     gap: '1px',
   },
   calendarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: '20px',
-    padding: '10px',
+    padding: '8px 10px', // Сжали отступы
     display: 'flex',
     flexDirection: 'column',
     boxSizing: 'border-box',
@@ -2241,7 +3007,7 @@ const widgetStyles: Record<string, React.CSSProperties> = {
   calendarDaysHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '8px',
+    fontSize: '7.5px', // Чуть уменьшили дни недели
     fontWeight: '700',
     color: '#A8A7A5',
     textAlign: 'center',
@@ -2249,22 +3015,22 @@ const widgetStyles: Record<string, React.CSSProperties> = {
   calendarGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)', 
-    rowGap: '6px', 
+    rowGap: '4px', // Уменьшили вертикальный зазор между днями (было 6px)
     columnGap: '2px',
-    marginTop: '6px',
+    marginTop: '4px',
   },
   dayCell: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     aspectRatio: '1/1',
-    width: '18px',
-    height: '18px',
+    width: '16px', // Уменьшили размер ячейки дня (было 18px)
+    height: '16px',
     margin: '0 auto',
     boxSizing: 'border-box',
   },
   dayNumber: {
-    fontSize: '10px',
+    fontSize: '9px', // Слегка уменьшили цифры (было 10px)
     fontWeight: '500',
     color: '#151414',
   },
@@ -2297,21 +3063,25 @@ const galleryStyles: Record<string, React.CSSProperties> = {
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: '14px',
+    borderRadius: '16px',
     padding: '6px',
     display: 'flex',
     flexDirection: 'column',
     gap: '6px',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.02)',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
     boxSizing: 'border-box',
     position: 'relative',
+    width: '100%', 
+    height: '190px',
+    overflow: 'visible',
   },
   imageWrapper: {
     width: '100%',
-    aspectRatio: '1/1',
+    height: '160px',
     borderRadius: '10px',
     overflow: 'hidden',
     backgroundColor: '#E6E5E3',
+    flexShrink: 0,
   },
   cardImage: {
     width: '100%',
@@ -2340,7 +3110,7 @@ const galleryStyles: Record<string, React.CSSProperties> = {
   },
   outfitPreviewGrid: {
     width: '100%',
-    aspectRatio: '1/1',
+    height: '100px',
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '3px',
@@ -2348,6 +3118,7 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
     padding: '3px',
     boxSizing: 'border-box',
+    overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
@@ -2619,16 +3390,15 @@ const cartPageStyles: Record<string, React.CSSProperties> = {
   },
   restoreBtn: {
     position: 'absolute',
-    top: '10px',
-    right: '10px',
-    width: '20px',
-    height: '20px',
+    top: '8px', 
+    right: '8px',
+    width: '24px',
+    height: '24px',
     borderRadius: '50%',
-    backgroundColor: '#151414',
+    backgroundColor: 'rgba(21, 20, 20, 0.8)',
     color: '#FFFFFF',
     border: 'none',
-    outline: 'none',
-    fontSize: '11px',
+    fontSize: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
