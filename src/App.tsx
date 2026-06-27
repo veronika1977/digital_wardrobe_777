@@ -226,7 +226,7 @@ function App() {
   const { initData, isTelegram, haptic } = useTelegram();
   const [token, setToken] = useLocalStorage<string | null>('jwt_token', null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-  
+  const [isUploading, setIsUploading] = useState(false);
   const [editingOutfitId, setEditingOutfitId] = useState<number | null>(null);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'profile' | 'cart'>('home');
@@ -469,6 +469,12 @@ function App() {
     const styleTag = document.createElement('style');
     styleTag.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+      
+      @keyframes spin {
+      0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
       body, button, input, select, textarea, span, div {
         font-family: 'Inter', sans-serif !important;
       }
@@ -1862,6 +1868,12 @@ function App() {
               <button onClick={resetDrawerState} style={drawerStyles.closeBtn}>✕</button>
             </div>
             <div style={drawerStyles.scrollContainer}>
+              {isUploading && (
+                <div style={drawerStyles.loadingOverlay}>
+                  <div style={drawerStyles.spinner} />
+                  <span style={drawerStyles.loadingText}>Загружаем фото...</span>
+                </div>
+              )}
               {!newImage ? (
                 <>
                   <div style={{
@@ -1972,7 +1984,12 @@ function App() {
                       let finalImageUrl = newImage; 
                       
                       if (newImage && newImage.startsWith('data:image/')) {
-                        finalImageUrl = await uploadImageAndGetUrl(newImage);
+                        setIsUploading(true); // <-- ВКЛЮЧАЕМ ЛОАДЕР
+                        try {
+                          finalImageUrl = await uploadImageAndGetUrl(newImage);
+                        } finally {
+                          setIsUploading(false); // <-- ВЫКЛЮЧАЕМ ЛОАДЕР (даже если ошибка)
+                        }
                       }
 
                       const method = editingItemId ? 'PATCH' : 'POST';
@@ -2853,6 +2870,36 @@ const drawerStyles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    zIndex: 1000,
+    backdropFilter: 'blur(4px)',
+  },
+  spinner: {
+    width: '48px',
+    height: '48px',
+    border: '3px solid #E6E5E3',
+    borderTop: '3px solid #151414',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#6B6A69',
+    fontFamily: 'Inter, sans-serif',
+    letterSpacing: '0.5px',
   },
 };
 
