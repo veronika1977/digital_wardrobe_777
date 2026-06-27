@@ -230,7 +230,10 @@ function App() {
   const [editingOutfitId, setEditingOutfitId] = useState<number | null>(null);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'profile' | 'cart'>('home');
-  
+  const [trashClothes, setTrashClothes] = useState<any[]>([]);
+  const [trashOutfits, setTrashOutfits] = useState<any[]>([]);
+  const [trashCapsules, setTrashCapsules] = useState<any[]>([]);
+  const [isCartLoading, setIsCartLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedItemForView, setSelectedItemForView] = useState<any | null>(null);
   const [selectedOutfitForView, setSelectedOutfitForView] = useState<any | null>(null);
@@ -285,20 +288,59 @@ function App() {
     setDeleteConfirm({ id, type });
   };
 
-  const getDaysLeft = (deletedAt: string | null): string => {
-  if (!deletedAt) return '';
-  const deletedDate = new Date(deletedAt).getTime();
-  if (isNaN(deletedDate)) return '';
-  
-  const now = new Date().getTime();
-  const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000; // 14 дней в миллисекундах
-  const expirationDate = deletedDate + fourteenDaysMs;
-  const diffMs = expirationDate - now;
-  
-  if (diffMs <= 0) return 'Сегодня';
-  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  return `${daysLeft} дн.`;
-};
+  const fetchCart = async () => {
+    if (!token) return;
+    setIsCartLoading(true);
+    try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      
+      let mappedTrashClothes: any[] = [];
+      const clothesRes = await fetch(`${API_BASE_URL}/clothes/trash`, { headers });
+      if (clothesRes.ok) {
+        const data = await clothesRes.json();
+        mappedTrashClothes = data.map((i: any) => ({ ...i, img: getFullImageUrl(i.image_url) }));
+        setTrashClothes(mappedTrashClothes);
+      }
+
+      const outfitsRes = await fetch(`${API_BASE_URL}/outfits/trash`, { headers });
+      if (outfitsRes.ok) {
+        const data = await outfitsRes.json();
+        setTrashOutfits(data.map((o: any) => ({
+          ...o,
+          items: (o.items || []).map((item: any) => {
+            const cId = item.clothing_id || item.id;
+            const cloth = [...mappedTrashClothes, ...clothes].find(c => c.id === cId);
+            return { ...item, id: cId, img: getFullImageUrl(item.image_url || cloth?.img || item.img) };
+          })
+        })));
+      }
+
+      const capsulesRes = await fetch(`${API_BASE_URL}/capsules/trash`, { headers });
+      if (capsulesRes.ok) {
+        const data = await capsulesRes.json();
+        setTrashCapsules(data.map((c: any) => ({
+          ...c,
+          items: (c.items || []).map((item: any) => {
+            const cId = item.clothing_id || item.id;
+            const cloth = [...mappedTrashClothes, ...clothes].find(c => c.id === cId);
+            return { ...item, id: cId, img: getFullImageUrl(item.image_url || cloth?.img || item.img) };
+          }),
+          outfits: (c.outfits || []).map((o: any) => ({
+            ...o,
+            items: (o.items || []).map((item: any) => {
+              const cId = item.clothing_id || item.id;
+              const cloth = [...mappedTrashClothes, ...clothes].find(c => c.id === cId);
+              return { ...item, id: cId, img: getFullImageUrl(item.image_url || cloth?.img || item.img) };
+            })
+          }))
+        })));
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки корзины:', error);
+    } finally {
+      setIsCartLoading(false);
+    }
+  };
 
   const uploadImageAndGetUrl = async (base64Image: string) => {
     const response = await fetch(base64Image);
@@ -367,6 +409,9 @@ function App() {
     } catch (error) {
       console.error(error);
       alert('Не удалось удалить');
+    }
+    if (currentScreen === 'cart') {
+      fetchCart();
     }
     setDeleteConfirm(null);
   };
@@ -464,6 +509,12 @@ function App() {
     setDrawerError(null);
     setEditingItemId(null);
   };
+
+  useEffect(() => {
+  if (currentScreen === 'cart' && token) {
+    fetchCart();
+  }
+}, [currentScreen, token]);
 
   useEffect(() => {
     const styleTag = document.createElement('style');
@@ -830,229 +881,229 @@ function App() {
           )}
 
           {currentScreen === 'cart' && (
-            <div style={pageStyle}>
-              <div style={headerStyles.headerContainer}>
-                <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img
-                    src="/Icon.png"
-                    alt="VS Logo"
-                    style={{ width: '60px', height: '60px', objectFit: 'contain' }}
-                  />
-                </div>
-                <h1 style={{ ...headerStyles.headerTitle, marginLeft: '40px' }} className="fancy-serif">КОРЗИНА</h1>
-                <button
-                  onClick={() => {
-                    setCurrentScreen('profile');
-                    haptic('light');
-                  }}
-                  style={{ ...headerStyles.searchBtn, backgroundColor: '#151414' }}
-                  title="Назад в гардероб"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                  </svg>
-                </button>
+          <div style={pageStyle}>
+            <div style={headerStyles.headerContainer}>
+              <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="/Icon.png" alt="VS Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
               </div>
-              <div style={cartPageStyles.infoBanner}>
-                Вещи хранятся в корзине 14 дней, после чего удаляются автоматически.
-              </div>
-              {(() => {
-                const deletedClothes = clothes.filter((item: any) => item.deletedAt);
-                const deletedOutfits = outfits.filter((item: any) => item.deletedAt);
-                const deletedCapsules = capsules.filter((item: any) => item.deletedAt);
-                const hasDeletedItems = deletedClothes.length > 0 || deletedOutfits.length > 0 || deletedCapsules.length > 0;
-                
-                const executeRestore = async () => {
-                  if (!restoreConfirm) return;
-                  const { id, type } = restoreConfirm;
-                  const endpoints: any = { clothes: 'clothes', outfits: 'outfits', capsules: 'capsules' };
-                  try {
-                    const response = await fetch(`${API_BASE_URL}/${endpoints[type]}/${id}/restore`, {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (!response.ok) throw new Error('Не удалось восстановить');
-                    
-                    if (type === 'clothes') {
-                      setClothes(prev => prev.map(item => item.id === id ? { ...item, deletedAt: null } : item));
-                    } else if (type === 'outfits') {
-                      setOutfits(prev => prev.map(item => item.id === id ? { ...item, deletedAt: null } : item));
-                    } else if (type === 'capsules') {
-                      setCapsules(prev => prev.map(item => item.id === id ? { ...item, deletedAt: null } : item));
-                    }
-                    alert('Восстановлено!');
-                  } catch (e) {
-                    alert('Ошибка восстановления');
-                  }
-                  setRestoreConfirm(null);
-                };
-
-                if (!hasDeletedItems) {
-                  return (
-                    <div style={cartPageStyles.container}>
-                      <span style={cartPageStyles.emptyText}>Корзина пуста</span>
-                      <p style={cartPageStyles.emptySubtext}>Здесь будут отображаться удаленные вами вещи и образы.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {deletedClothes.length > 0 && (
-                      <div>
-                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленная одежда</span>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateRows: deletedClothes.length === 1 ? '190px' : 'repeat(2, 190px)',
-                          gridAutoFlow: 'column',
-                          gridAutoColumns: 'calc(33.33% - 7px)',
-                          gap: '10px',
-                          overflowX: 'auto',
-                          marginTop: '8px',
-                          paddingBottom: '6px',
-                          WebkitOverflowScrolling: 'touch',
-                          scrollbarWidth: 'none'
-                        }}>
-                          {deletedClothes.map((item: any) => (
-                            <div key={item.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                              <button onClick={() => requestRestore(item.id, 'clothes')} style={cartPageStyles.restoreBtn}>↩</button>
-                              <div style={galleryStyles.imageWrapper}>
-                                <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
-                                <div style={cartPageStyles.daysLeftBadge}>{getDaysLeft(item.deletedAt)}</div>
-                              </div>
-                              <span style={galleryStyles.cardTitle}>{item.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {deletedOutfits.length > 0 && (
-                      <div style={{ marginTop: '16px' }}>
-                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные образы</span>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateRows: deletedOutfits.length === 1 ? '190px' : 'repeat(2, 190px)',
-                          gridAutoFlow: 'column',
-                          gridAutoColumns: 'calc(33.33% - 7px)',
-                          gap: '10px',
-                          overflowX: 'auto',
-                          marginTop: '8px',
-                          paddingBottom: '6px',
-                          WebkitOverflowScrolling: 'touch',
-                          scrollbarWidth: 'none'
-                        }}>
-                          {deletedOutfits.map((outfit: any) => (
-                            <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                              <button onClick={() => requestRestore(outfit.id, 'outfits')} style={cartPageStyles.restoreBtn}>↩</button>
-                              <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
-                                {(outfit.items || []).map((item: any, idx: number) => {
-                                  const factor = 0.333;
-                                  return (
-                                    <img
-                                      key={`${item.id}-${idx}`}
-                                      src={item.img}
-                                      alt=""
-                                      style={{
-                                        position: 'absolute',
-                                        left: `${item.x * factor}px`,
-                                        top: `${item.y * factor}px`,
-                                        width: `${110 * factor * (item.scale || 1)}px`,
-                                        height: `${110 * factor * (item.scale || 1)}px`,
-                                        objectFit: 'contain'
-                                      }}
-                                    />
-                                  );
-                                })}
-                                <div style={cartPageStyles.daysLeftBadge}>{getDaysLeft(outfit.deletedAt)}</div>
-                              </div>
-                              <span style={galleryStyles.cardTitle}>{outfit.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {deletedCapsules.length > 0 && (
-                      <div style={{ marginTop: '16px' }}>
-                        <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные капсулы</span>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateRows: deletedCapsules.length === 1 ? '190px' : 'repeat(2, 190px)',
-                          gridAutoFlow: 'column',
-                          gridAutoColumns: 'calc(33.33% - 7px)',
-                          gap: '10px',
-                          overflowX: 'auto',
-                          marginTop: '8px',
-                          paddingBottom: '6px',
-                          WebkitOverflowScrolling: 'touch',
-                          scrollbarWidth: 'none'
-                        }}>
-                          {deletedCapsules.map((capsule: any) => {
-                            const itemsCount = capsule.items?.length || 0;
-                            const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
-                            return (
-                              <div key={capsule.id} style={{ ...galleryStyles.card, position: 'relative' }}>
-                                <button onClick={() => requestRestore(capsule.id, 'capsules')} style={cartPageStyles.restoreBtn}>↩</button>
-                                <div style={{
-                                  ...galleryStyles.imageWrapper,
-                                  display: 'grid',
-                                  gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                                  gap: '4px',
-                                  padding: '4px',
-                                  boxSizing: 'border-box',
-                                  alignContent: 'center',
-                                  position: 'relative'
-                                }}>
-                                  {capsule.items && capsule.items.map((item: any, idx: number) => (
-                                    <img
-                                      key={item.id || idx}
-                                      src={item.img}
-                                      style={{
-                                        width: '100%',
-                                        aspectRatio: '1/1',
-                                        objectFit: 'cover',
-                                        borderRadius: '4px',
-                                        backgroundColor: '#edecea'
-                                      }}
-                                      alt=""
-                                    />
-                                  ))}
-                                  <div style={cartPageStyles.daysLeftBadge}>{getDaysLeft(capsule.deletedAt)}</div>
-                                </div>
-                                <span style={galleryStyles.cardTitle}>{capsule.name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {restoreConfirm && (
-                      <>
-                        <div onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmBackdrop} />
-                        <div style={galleryStyles.confirmBox}>
-                          <span style={galleryStyles.confirmText}>Восстановить из корзины?</span>
-                          <div style={galleryStyles.confirmActions}>
-                            <button
-                              onClick={executeRestore} 
-                              style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }}
-                            >
-                              Да
-                            </button>
-                            <button onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
+              <h1 style={{ ...headerStyles.headerTitle, marginLeft: '40px' }} className="fancy-serif">КОРЗИНА</h1>
+              <button
+                onClick={() => { setCurrentScreen('profile'); haptic('light'); }}
+                style={{ ...headerStyles.searchBtn, backgroundColor: '#151414' }}
+                title="Назад в гардероб"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
             </div>
-          )}
+            <div style={cartPageStyles.infoBanner}>
+              Вещи хранятся в корзине 14 дней, после чего удаляются автоматически.
+            </div>
 
-          {isSearchOpen && (
+            {isCartLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+                <div style={drawerStyles.spinner} />
+              </div>
+            ) : trashClothes.length === 0 && trashOutfits.length === 0 && trashCapsules.length === 0 ? (
+              <div style={cartPageStyles.container}>
+                <span style={cartPageStyles.emptyText}>Корзина пуста</span>
+                <p style={cartPageStyles.emptySubtext}>Здесь будут отображаться удаленные вами вещи и образы.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                {trashClothes.length > 0 && (
+                  <div>
+                    <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленная одежда</span>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateRows: trashClothes.length === 1 ? '190px' : 'repeat(2, 190px)',
+                      gridAutoFlow: 'column',
+                      gridAutoColumns: 'calc(33.33% - 7px)',
+                      gap: '10px',
+                      overflowX: 'auto',
+                      marginTop: '8px',
+                      paddingBottom: '6px',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none'
+                    }}>
+                      {trashClothes.map((item: any) => (
+                        <div key={item.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                          <button onClick={() => requestRestore(item.id, 'clothes')} style={cartPageStyles.restoreBtn}>↩</button>
+                          <div style={galleryStyles.imageWrapper}>
+                            <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
+                            {item.days_remaining !== undefined && item.days_remaining !== null && (
+                              <div style={{
+                                ...cartPageStyles.daysLeftBadge,
+                                color: item.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
+                              }}>
+                                {item.days_remaining > 0 ? `${item.days_remaining} дн.` : 'Сегодня'}
+                              </div>
+                            )}
+                          </div>
+                          <span style={galleryStyles.cardTitle}>{item.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {trashOutfits.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные образы</span>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateRows: trashOutfits.length === 1 ? '190px' : 'repeat(2, 190px)',
+                      gridAutoFlow: 'column',
+                      gridAutoColumns: 'calc(33.33% - 7px)',
+                      gap: '10px',
+                      overflowX: 'auto',
+                      marginTop: '8px',
+                      paddingBottom: '6px',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none'
+                    }}>
+                      {trashOutfits.map((outfit: any) => (
+                        <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                          <button onClick={() => requestRestore(outfit.id, 'outfits')} style={cartPageStyles.restoreBtn}>↩</button>
+                          <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
+                            {(outfit.items || []).map((item: any, idx: number) => {
+                              const factor = 0.333;
+                              return (
+                                <img
+                                  key={`${item.id}-${idx}`}
+                                  src={item.img}
+                                  alt=""
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${item.x * factor}px`,
+                                    top: `${item.y * factor}px`,
+                                    width: `${110 * factor * (item.scale || 1)}px`,
+                                    height: `${110 * factor * (item.scale || 1)}px`,
+                                    objectFit: 'contain'
+                                  }}
+                                />
+                              );
+                            })}
+                            {outfit.days_remaining !== undefined && outfit.days_remaining !== null && (
+                              <div style={{
+                                ...cartPageStyles.daysLeftBadge,
+                                color: outfit.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
+                              }}>
+                                {outfit.days_remaining > 0 ? `${outfit.days_remaining} дн.` : 'Сегодня'}
+                              </div>
+                            )}
+                          </div>
+                          <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {trashCapsules.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <span style={outfitStyles.sectionTitle} className="fancy-serif">Удаленные капсулы</span>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateRows: trashCapsules.length === 1 ? '190px' : 'repeat(2, 190px)',
+                      gridAutoFlow: 'column',
+                      gridAutoColumns: 'calc(33.33% - 7px)',
+                      gap: '10px',
+                      overflowX: 'auto',
+                      marginTop: '8px',
+                      paddingBottom: '6px',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none'
+                    }}>
+                      {trashCapsules.map((capsule: any) => {
+                        const itemsCount = capsule.items?.length || 0;
+                        const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
+                        return (
+                          <div key={capsule.id} style={{ ...galleryStyles.card, position: 'relative' }}>
+                            <button onClick={() => requestRestore(capsule.id, 'capsules')} style={cartPageStyles.restoreBtn}>↩</button>
+                            <div style={{
+                              ...galleryStyles.imageWrapper,
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                              gap: '4px',
+                              padding: '4px',
+                              boxSizing: 'border-box',
+                              alignContent: 'center',
+                              position: 'relative'
+                            }}>
+                              {capsule.items && capsule.items.map((item: any, idx: number) => (
+                                <img
+                                  key={item.id || idx}
+                                  src={item.img}
+                                  style={{
+                                    width: '100%',
+                                    aspectRatio: '1/1',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#edecea'
+                                  }}
+                                  alt=""
+                                />
+                              ))}
+
+                              {capsule.days_remaining !== undefined && capsule.days_remaining !== null && (
+                                <div style={{
+                                  ...cartPageStyles.daysLeftBadge,
+                                  color: capsule.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
+                                }}>
+                                  {capsule.days_remaining > 0 ? `${capsule.days_remaining} дн.` : 'Сегодня'}
+                                </div>
+                              )}
+                            </div>
+                            <span style={galleryStyles.cardTitle}>{capsule.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {restoreConfirm && (
+                  <>
+                    <div onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmBackdrop} />
+                    <div style={galleryStyles.confirmBox}>
+                      <span style={galleryStyles.confirmText}>Восстановить из корзины?</span>
+                      <div style={galleryStyles.confirmActions}>
+                        <button
+                          onClick={async () => {
+                            if (!restoreConfirm) return;
+                            const { id, type } = restoreConfirm;
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/${type}/${id}/restore`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                              });
+                              if (!response.ok) throw new Error('Не удалось восстановить');
+                              fetchCart();
+                              alert('Восстановлено!');
+                            } catch (e) {
+                              alert('Ошибка восстановления');
+                            }
+                            setRestoreConfirm(null);
+                          }}
+                          style={{ ...galleryStyles.confirmDeleteBtn, backgroundColor: '#4CAF50' }}
+                        >
+                          Да
+                        </button>
+                        <button onClick={() => setRestoreConfirm(null)} style={galleryStyles.confirmCancelBtn}>Отмена</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isSearchOpen && (
             <>
               <div
                 onClick={() => setIsSearchOpen(false)}
@@ -1302,6 +1353,7 @@ function App() {
                   ))}
                 </div>
               </div>
+              
               {showEmptyOutfitAlert && (
                 <>
                   <div onClick={() => setShowEmptyOutfitAlert(false)} style={galleryStyles.confirmBackdrop} />
@@ -1869,11 +1921,11 @@ function App() {
             </div>
             <div style={drawerStyles.scrollContainer}>
               {isUploading && (
-                <div style={drawerStyles.loadingOverlay}>
-                  <div style={drawerStyles.spinner} />
-                  <span style={drawerStyles.loadingText}>Загружаем фото...</span>
-                </div>
-              )}
+                  <div style={drawerStyles.loadingOverlay}>
+                    <div style={drawerStyles.spinner} />
+                    <span style={drawerStyles.loadingText}>Загружаем фото...</span>
+                  </div>
+                )}
               {!newImage ? (
                 <>
                   <div style={{
