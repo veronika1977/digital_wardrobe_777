@@ -85,7 +85,6 @@ const МАТЕРИАЛЫ = [
 ];
 
 const КАТЕГОРИИ = [
-  { id: "all", name: "Все" },
   { id: "outerwear", name: "Верхняя одежда" },
   { id: "top", name: "Верх" },
   { id: "bottom", name: "Низ" },
@@ -366,8 +365,25 @@ const welcomeStyles: Record<string, React.CSSProperties> = {
   }
 };
 
+const POPULAR_CITIES = [
+  { name: 'Москва', lat: 55.7558, lon: 37.6173 },
+  { name: 'Санкт-Петербург', lat: 59.9343, lon: 30.3351 },
+  { name: 'Казань', lat: 55.7964, lon: 49.1089 },
+  { name: 'Новосибирск', lat: 55.0084, lon: 82.9357 },
+  { name: 'Екатеринбург', lat: 56.8389, lon: 60.6057 },
+  { name: 'Нижний Новгород', lat: 56.2965, lon: 43.9361 },
+  { name: 'Краснодар', lat: 45.0355, lon: 38.9753 },
+  { name: 'Сочи', lat: 43.6028, lon: 39.7342 },
+  { name: 'Иннополис', lat: 55.45, lon: 48.44 },
+  { name: 'Владивосток', lat: 43.1198, lon: 131.8869 },
+];
+
 function App() {
     const { initData, isTelegram, haptic } = useTelegram();
+    const [outfitCreatedMessage, setOutfitCreatedMessage] = useState<string | null>(null);
+    const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
+    const [searchCityQuery, setSearchCityQuery] = useState('');
+    const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
     const [networkError, setNetworkError] = useState(false);
     const [deleteSuccessMessage, setDeleteSuccessMessage] = useState<string | null>(null);
     const [wearRecords, setWearRecords] = useState<any[]>([]);
@@ -385,6 +401,7 @@ function App() {
     const [isSavingCapsule, setIsSavingCapsule] = useState(false);
     const [weatherData, setWeatherData] = useState<any>(null);
     const [isLoadingWeather, setIsLoadingWeather] = useState(false);
+    const [isWeatherWidgetActive, setIsWeatherWidgetActive] = useState(false);
     const [weatherError, setWeatherError] = useState<string | null>(null);
     const [editingOutfitId, setEditingOutfitId] = useState<number | null>(null);
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -405,25 +422,20 @@ function App() {
     const [newSeason, setNewSeason] = useState('');
     const [newColor, setNewColor] = useState('');
     const [newMaterial, setNewMaterial] = useState('');
-
     const [showEmptyOutfitAlert, setShowEmptyOutfitAlert] = useState(false);
     const [showEmptyCapsuleAlert, setShowEmptyCapsuleAlert] = useState(false);
     const [newImage, setNewImage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [drawerError, setDrawerError] = useState<string | null>(null);
-
     const [clothes, setClothes] = useState<WardrobeItem[]>([]);
     const [outfits, setOutfits] = useState<Outfit[]>([]);
     const [capsules, setCapsules] = useState<any[]>([]);
-
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [canvasItems, setCanvasItems] = useState<PositionedItem[]>([]);
     const [activeDragId, setActiveDragId] = useState<number | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
     const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
     const [pickerCategory, setPickerCategory] = useState('all');
-
     const [isOutfitCreatorOpen, setIsOutfitCreatorOpen] = useState(false);
     const [isCapsuleCreatorOpen, setIsCapsuleCreatorOpen] = useState(false);
     const [editingCapsuleId, setEditingCapsuleId] = useState<number | null>(null);
@@ -432,14 +444,12 @@ function App() {
     const [capsulePickerCategory, setCapsulePickerCategory] = useState('all');
     const [capsuleStep, setCapsuleStep] = useState<'items' | 'outfits'>('items');
     const [capsuleOutfits, setCapsuleOutfits] = useState<any[]>([]);
-
     const [isCapsuleOutfitCreatorOpen, setIsCapsuleOutfitCreatorOpen] = useState(false);
     const [capsuleOutfitName, setCapsuleOutfitName] = useState('');
     const [capsuleCanvasItems, setCapsuleCanvasItems] = useState<any[]>([]);
     const [capsuleActiveDragId, setCapsuleActiveDragId] = useState<number | null>(null);
     const [capsuleDragOffset, setCapsuleDragOffset] = useState({ x: 0, y: 0 });
     const [isCapsuleOutfitItemPickerOpen, setIsCapsuleOutfitItemPickerOpen] = useState(false);
-
     const [outfitName, setOutfitName] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
 
@@ -747,112 +757,162 @@ function App() {
         );
     };
 
-    const fetchWeather = async () => {
-        const LAT = 55.45;
-        const LON = 48.44;
-        setIsLoadingWeather(true);
-        setWeatherError(null); // Сбрасываем ошибку перед запросом
+    const getCityName = async (lat: number, lon: number): Promise<string> => {
         try {
+            const API_KEY = 'bdc_517a7acc074b4c32858f1b2694c3d4fd';
+            // ✅ ДОБАВЛЕН КЛЮЧ В URL
             const response = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,weathercode&timezone=auto`
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=ru&key=${API_KEY}`
             );
-            if (!response.ok) throw new Error('Ошибка погоды');
+            if (!response.ok) throw new Error('BigDataCloud error');
             const data = await response.json();
-            const hourly = data.hourly;
-            
-            if (!hourly || !hourly.time || hourly.time.length === 0) {
-                throw new Error('Пустой ответ от API');
-            }
-            
-            const now = new Date();
-            const today = now.getDate();
-            const todayMonth = now.getMonth();
-            const todayYear = now.getFullYear();
-            
-            let currentHourIndex = hourly.time.findIndex((t: string) => {
-                const timeDate = new Date(t);
-                return (
-                    timeDate.getFullYear() === todayYear &&
-                    timeDate.getMonth() === todayMonth &&
-                    timeDate.getDate() === today &&
-                    timeDate.getHours() === now.getHours()
-                );
-            });
-            
-            if (currentHourIndex === -1) {
-                for (let i = hourly.time.length - 1; i >= 0; i--) {
-                    if (new Date(hourly.time[i]) <= now) {
-                        currentHourIndex = i;
-                        break;
-                    }
-                }
-                if (currentHourIndex === -1) currentHourIndex = 0;
-            }
-            
-            const currentTemp = Math.round(hourly.temperature_2m[currentHourIndex]);
-            const currentWeatherCode = hourly.weathercode[currentHourIndex];
-            
-            const getAvgTempAndWeather = (startHour: number, endHour: number) => {
-                const temps: number[] = [];
-                const weatherCodes: number[] = [];
-                
-                for (let i = 0; i < hourly.time.length; i++) {
-                    const timeDate = new Date(hourly.time[i]);
-                    const h = timeDate.getHours();
-                    const day = timeDate.getDate();
-                    const month = timeDate.getMonth();
-                    const year = timeDate.getFullYear();
-                    
-                    if (
-                        day === today &&
-                        month === todayMonth &&
-                        year === todayYear &&
-                        h >= startHour &&
-                        h <= endHour
-                    ) {
-                        temps.push(hourly.temperature_2m[i]);
-                        weatherCodes.push(hourly.weathercode[i]);
-                    }
-                }
-                
-                if (temps.length === 0) return { temp: null, weatherCode: null };
-                
-                const freq: Record<number, number> = {};
-                weatherCodes.forEach(code => {
-                    freq[code] = (freq[code] || 0) + 1;
-                });
-                
-                let mostCommonCode = weatherCodes[0];
-                let maxCount = 0;
-                for (const code in freq) {
-                    if (freq[Number(code)] > maxCount) {
-                        maxCount = freq[Number(code)];
-                        mostCommonCode = Number(code);
-                    }
-                }
-                
-                return {
-                    temp: Math.round(temps.reduce((a, b) => a + b, 0) / temps.length),
-                    weatherCode: mostCommonCode
-                };
-            };
-            
-            setWeatherData({
-                temp: currentTemp,
-                weatherCode: currentWeatherCode,
-                city: 'Иннополис',
-                morning: getAvgTempAndWeather(6, 11),
-                day: getAvgTempAndWeather(12, 17),
-                evening: getAvgTempAndWeather(18, 23),
-            });
+            console.log('📍 Данные геолокации:', data);
+            return data.city || data.locality || data.principalSubdivision || 'Моё местоположение';
         } catch (error) {
-            console.error('Не удалось загрузить погоду:', error);
-            setWeatherError('Сервис погоды недоступен');
-            setWeatherData(null);
-        } finally {
-            setIsLoadingWeather(false);
+            console.warn('Не удалось получить название города:', error);
+            return 'Моё местоположение';
         }
     };
+
+    const fetchWeather = async (forcedLocation?: { lat: number, lon: number, city: string }) => {
+    setIsLoadingWeather(true);
+    setWeatherError(null);
+    try {
+        let LAT = 0;
+        let LON = 0;
+        let city = '';
+
+        // ✅ ЕСЛИ ПЕРЕДАЛИ ПРИНУДИТЕЛЬНЫЕ КООРДИНАТЫ (ВЫБОР ГОРОДА ИЛИ ГЕОЛОКАЦИЯ) - ИСПОЛЬЗУЕМ ИХ
+        if (forcedLocation) {
+            LAT = forcedLocation.lat;
+            LON = forcedLocation.lon;
+            city = forcedLocation.city;
+            console.log('✅ [Гео] Используем принудительно переданный город:', city, LAT, LON);
+        } else {
+            // ===== ШАГ 1: Читаем ТОЛЬКО с бэкенда =====
+            try {
+                const locationRes = await fetch(`${API_BASE_URL}/weather/location`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (locationRes.ok) {
+                    const locData = await locationRes.json();
+                    console.log('🔍 [Гео] Сырые данные с бэка:', JSON.stringify(locData));
+                    
+                    // Гибкий парсинг
+                    const lat = locData?.latitude ?? locData?.lat ?? locData?.data?.latitude ?? locData?.data?.lat;
+                    const lon = locData?.longitude ?? locData?.lon ?? locData?.lng ?? locData?.data?.longitude ?? locData?.data?.lon ?? locData?.data?.lng;
+                    
+                    if (lat !== undefined && lat !== null && lon !== undefined && lon !== null) {
+                        LAT = Number(lat);
+                        LON = Number(lon);
+                        city = locData?.city ?? locData?.data?.city ?? locData?.name ?? '';
+                        console.log('✅ [Гео] Загружено с бэкенда:', LAT, LON, city);
+                    }
+                } else {
+                    console.warn('⚠️ [Гео] Бэк вернул статус:', locationRes.status);
+                }
+            } catch (e) {
+                console.warn('⚠️ [Гео] Ошибка запроса к бэку:', e);
+            }
+
+            // ===== ШАГ 2: Если на бэке пусто — показываем заглушку =====
+            if (!LAT || !LON) {
+                console.warn('⚠️ [Гео] На бэке нет данных о локации. Показываем заглушку.');
+                setWeatherData(null);
+                setIsLoadingWeather(false);
+                return;
+            }
+        }
+
+        // ===== ШАГ 3: Запрашиваем погоду (Open-Meteo) =====
+        const response = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,weathercode&timezone=auto`
+        );
+        if (!response.ok) throw new Error('Ошибка погоды');
+        
+        const data = await response.json();
+        const hourly = data.hourly;
+        if (!hourly || !hourly.time || hourly.time.length === 0) {
+            throw new Error('Пустой ответ от API');
+        }
+
+        const now = new Date();
+        const today = now.getDate();
+        const todayMonth = now.getMonth();
+        const todayYear = now.getFullYear();
+
+        let currentHourIndex = hourly.time.findIndex((t: string) => {
+            const timeDate = new Date(t);
+            return (
+                timeDate.getFullYear() === todayYear &&
+                timeDate.getMonth() === todayMonth &&
+                timeDate.getDate() === today &&
+                timeDate.getHours() === now.getHours()
+            );
+        });
+
+        if (currentHourIndex === -1) {
+            for (let i = hourly.time.length - 1; i >= 0; i--) {
+                if (new Date(hourly.time[i]) <= now) {
+                    currentHourIndex = i;
+                    break;
+                }
+            }
+            if (currentHourIndex === -1) currentHourIndex = 0;
+        }
+
+        const currentTemp = Math.round(hourly.temperature_2m[currentHourIndex]);
+        const currentWeatherCode = hourly.weathercode[currentHourIndex];
+
+        const getAvgTempAndWeather = (startHour: number, endHour: number) => {
+            const temps: number[] = [];
+            const weatherCodes: number[] = [];
+            for (let i = 0; i < hourly.time.length; i++) {
+                const timeDate = new Date(hourly.time[i]);
+                const h = timeDate.getHours();
+                const day = timeDate.getDate();
+                const month = timeDate.getMonth();
+                const year = timeDate.getFullYear();
+                if (day === today && month === todayMonth && year === todayYear && h >= startHour && h <= endHour) {
+                    temps.push(hourly.temperature_2m[i]);
+                    weatherCodes.push(hourly.weathercode[i]);
+                }
+            }
+            if (temps.length === 0) return { temp: null, weatherCode: null };
+            
+            const freq: Record<number, number> = {};
+            weatherCodes.forEach(code => { freq[code] = (freq[code] || 0) + 1; });
+            let mostCommonCode = weatherCodes[0];
+            let maxCount = 0;
+            for (const code in freq) {
+                if (freq[Number(code)] > maxCount) {
+                    maxCount = freq[Number(code)];
+                    mostCommonCode = Number(code);
+                }
+            }
+            return {
+                temp: Math.round(temps.reduce((a, b) => a + b, 0) / temps.length),
+                weatherCode: mostCommonCode
+            };
+        };
+
+        setWeatherData({
+            temp: currentTemp,
+            weatherCode: currentWeatherCode,
+            city: city,
+            morning: getAvgTempAndWeather(6, 11),
+            day: getAvgTempAndWeather(12, 17),
+            evening: getAvgTempAndWeather(18, 23),
+        });
+    } catch (error) {
+        console.error('❌ [Гео] Не удалось загрузить погоду:', error);
+        setWeatherError('Сервис погоды недоступен');
+        setWeatherData(null);
+    } finally {
+        setIsLoadingWeather(false);
+    }
+};
 
     const deleteWearRecord = async (recordId: number) => {
     try {
@@ -874,15 +934,15 @@ function App() {
 
     const getWeatherEmoji = (code: number | null): string => {
     if (code === null) return '';
-    if (code === 0) return '☀️'; // Ясно
-    if (code >= 1 && code <= 3) return '🌤️'; // Переменная облачность
-    if (code >= 45 && code <= 48) return '🌫️'; // Туман
-    if (code >= 51 && code <= 55) return '🌦️'; // Морось
-    if (code >= 61 && code <= 67) return '️'; // Дождь
-    if (code >= 71 && code <= 77) return '🌨️'; // Снег
-    if (code >= 80 && code <= 82) return '🌦️'; // Ливень
-    if (code >= 85 && code <= 86) return '🌨️'; // Снежные ливни
-    if (code >= 95 && code <= 99) return '⛈️'; // Гроза
+    if (code === 0) return '☀️';
+    if (code >= 1 && code <= 3) return '🌤️';
+    if (code >= 45 && code <= 48) return '🌫️';
+    if (code >= 51 && code <= 55) return '🌦️';
+    if (code >= 61 && code <= 67) return '️';
+    if (code >= 71 && code <= 77) return '🌨️';
+    if (code >= 80 && code <= 82) return '🌦️';
+    if (code >= 85 && code <= 86) return '🌨️';
+    if (code >= 95 && code <= 99) return '⛈️';
     return '🌡️';
     };
 
@@ -902,6 +962,11 @@ function App() {
 
     const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
         if (activeDragId === null) return;
+
+            if (e.cancelable) {
+            e.preventDefault();
+        }
+
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
         setCanvasItems(prev => prev.map(item => {
@@ -983,8 +1048,8 @@ function App() {
     }, [currentScreen, token]);
 
     useEffect(() => {
-        const styleTag = document.createElement('style');
-        styleTag.textContent = `
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
       
       @keyframes spin {
@@ -1011,24 +1076,32 @@ function App() {
         letter-spacing: normal !important;
         font-weight: 500 !important;
       }
+
+      /* ✅ НОВОЕ: Поворот стрелки у select при фокусе */
+select:focus {
+background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23151414' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 15 12 9 18 15'></polyline></svg>") !important;
+background-repeat: no-repeat !important;
+background-position: right 8px center !important;
+background-size: 12px !important;
+}
     `;
-        document.body.style.backgroundColor = '#edecea';
-        document.body.style.color = '#151414';
-        document.body.style.overflow = 'hidden';
-        document.body.style.height = '100vh';
-        document.body.style.touchAction = 'none';
-        if (document.documentElement) {
-            document.documentElement.style.backgroundColor = '#edecea';
-            document.documentElement.style.overflow = 'hidden';
-            document.documentElement.style.height = '100vh';
-        }
-        document.head.appendChild(styleTag);
-        return () => {
-            if (document.head.contains(styleTag)) {
-                document.head.removeChild(styleTag);
-            }
-        };
-    }, []);
+    document.body.style.backgroundColor = '#edecea';
+    document.body.style.color = '#151414';
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+    document.body.style.touchAction = 'none';
+    if (document.documentElement) {
+      document.documentElement.style.backgroundColor = '#edecea';
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.height = '100vh';
+    }
+    document.head.appendChild(styleTag); 
+    return () => {
+      if (document.head.contains(styleTag)) {
+        document.head.removeChild(styleTag);
+      }
+    };
+  }, []);
 
     useEffect(() => {
         if (!token) return;
@@ -1228,7 +1301,15 @@ try {
     }, [initData, isTelegram, setToken]);
 
     return (
-        <div style={{ minHeight: '100vh', backgroundColor: '#edecea', position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+        <div 
+            style={{ minHeight: '100vh', backgroundColor: '#edecea', position: 'relative', width: '100%', boxSizing: 'border-box' }}
+            onClick={() => {
+                // Закрываем виджет погоды при клике вне его
+                if (isWeatherWidgetActive) {
+                    setIsWeatherWidgetActive(false);
+                }
+            }}
+        >
             {!isAuthLoading && !hasSeenWelcome ? (
                 <WelcomeScreen onFinish={() => {
                     setHasSeenWelcome(true);
@@ -1238,18 +1319,21 @@ try {
                 <>
                     {currentScreen === 'home' && (
                         <div style={{
-                            width: '100%',
-                            height: '80vh',
-                            maxHeight: '100vh',
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            padding: '16px 16px 80px 16px',
-                            boxSizing: 'border-box',
-                            overflow: 'hidden'
-                        }}>
+    width: '100%',
+    height: '100vh', // ✅ На весь экран
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: '16px 16px 100px 16px', // ✅ Увеличили отступ снизу, чтобы кнопка не пряталась под навбар
+    boxSizing: 'border-box',
+    overflowY: 'auto', // ✅ Разрешаем скролл, если контент не влезает
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    display: 'flex', // ✅ Делаем флексом
+    flexDirection: 'column', // ✅ Колонкой
+}}>
                             <div style={headerStyles.headerContainer}>
                                 <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <img
@@ -1260,7 +1344,7 @@ try {
                                 </div>
                                 <h1 style={headerStyles.headerTitle} className="fancy-serif">ГЛАВНАЯ</h1>
                             </div>
-                            <div style={outfitStyles.sectionContainer}>
+                            <div style={{ ...outfitStyles.sectionContainer, flexShrink: 0 }}>
                                 <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Образ сегодня</h2>
                                 <div style={outfitStyles.mainRow}>
                                     <div style={outfitStyles.outfitCard}>
@@ -1303,89 +1387,123 @@ try {
                                     })()}
                                         </div>
                                     <div style={widgetStyles.weatherCard}>
-                                        {isLoadingWeather ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                                <span style={{ fontSize: '12px', color: '#8B8A89' }}>Загрузка...</span>
-                                            </div>
-                                        ) : weatherError ? (
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '8px' }}>
-                                                <span style={{ fontSize: '24px' }}>⚠️</span>
-                                                <span style={{ fontSize: '12px', color: '#E57373', fontWeight: '600', textAlign: 'center' }}>
-                                                    {weatherError}
-                                                </span>
-                                                <button
-                                                    onClick={() => {
-                                                        setWeatherError(null);
-                                                        fetchWeather();
-                                                    }}
-                                                    style={{
-                                                        marginTop: '4px',
-                                                        padding: '6px 14px',
-                                                        backgroundColor: '#151414',
-                                                        color: '#FFFFFF',
-                                                        border: 'none',
-                                                        borderRadius: '10px',
-                                                        fontSize: '11px',
-                                                        fontWeight: '600',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Повторить
-                                                </button>
-                                            </div>
-                                        ) : !weatherData ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                                <span style={{ fontSize: '12px', color: '#8B8A89' }}>Нет данных</span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                    <div>
-                                                        <div style={widgetStyles.weatherCity}>{weatherData.city}</div>
-                                                        <div style={widgetStyles.weatherTemp}>
-                                                            {getWeatherEmoji(weatherData.weatherCode)} {weatherData.temp > 0 ? '+' : ''}{weatherData.temp}°
-                                                        </div>
-                                                    </div>
-                                                    <span style={{ fontSize: '11px', fontWeight: '500' }}>Сегодня</span>
-                                                </div>
-                                                <div style={widgetStyles.hourlyRow}>
-                                                    <div style={widgetStyles.hourItem}>
-                                                        <div>Утро</div>
-                                                        <div style={{ fontWeight: '600' }}>
-                                                            {weatherData.morning?.temp !== null && weatherData.morning?.temp !== undefined
-                                                                ? `${weatherData.morning.temp > 0 ? '+' : ''}${weatherData.morning.temp}°`
-                                                                : '—'}
-                                                        </div>
-                                                        <div style={{ fontSize: '12px' }}>
-                                                            {getWeatherEmoji(weatherData.morning?.weatherCode)}
-                                                        </div>
-                                                    </div>
-                                                    <div style={widgetStyles.hourItem}>
-                                                        <div>День</div>
-                                                        <div style={{ fontWeight: '600' }}>
-                                                            {weatherData.day?.temp !== null && weatherData.day?.temp !== undefined
-                                                                ? `${weatherData.day.temp > 0 ? '+' : ''}${weatherData.day.temp}°`
-                                                                : '—'}
-                                                        </div>
-                                                        <div style={{ fontSize: '12px' }}>
-                                                            {getWeatherEmoji(weatherData.day?.weatherCode)}
-                                                        </div>
-                                                    </div>
-                                                    <div style={widgetStyles.hourItem}>
-                                                        <div>Вечер</div>
-                                                        <div style={{ fontWeight: '600' }}>
-                                                            {weatherData.evening?.temp !== null && weatherData.evening?.temp !== undefined
-                                                                ? `${weatherData.evening.temp > 0 ? '+' : ''}${weatherData.evening.temp}°`
-                                                                : '—'}
-                                                        </div>
-                                                        <div style={{ fontSize: '12px' }}>
-                                                            {getWeatherEmoji(weatherData.evening?.weatherCode)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
+    {/* 1. ШАПКА: Только город (без кнопки) */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={widgetStyles.weatherCity}>
+            {weatherData?.city || 'Местоположение'}
+        </div>
+    </div>
+
+    {/* 2. ОСНОВНОЙ КОНТЕНТ */}
+    {isLoadingWeather ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#8B8A89' }}>Загрузка...</span>
+        </div>
+    ) : weatherError ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '24px' }}>️</span>
+            <span style={{ fontSize: '12px', color: '#E57373', fontWeight: '600', textAlign: 'center' }}>
+                {weatherError}
+            </span>
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setWeatherError(null);
+                    fetchWeather();
+                }}
+                style={{
+                    marginTop: '4px',
+                    padding: '6px 14px',
+                    backgroundColor: '#151414',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                }}
+            >
+                Повторить
+            </button>
+        </div>
+    ) : !weatherData ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px' }}>
+            <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', lineHeight: '1.4' }}>
+                Нет данных о местоположении,<br />выберите город
+            </span>
+        </div>
+    ) : (
+        <>
+            {/* ✅ ТЕМПЕРАТУРА + КНОПКА "ИЗМЕНИТЬ" В ОДНОМ РЯДУ */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: '4px'
+            }}>
+                <div style={widgetStyles.weatherTemp}>
+                    {getWeatherEmoji(weatherData.weatherCode)} {weatherData.temp > 0 ? '+' : ''}{weatherData.temp}°
+                </div>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCityPickerOpen(true);
+                        haptic('light');
+                    }}
+                    style={{
+                        fontSize: '10px',
+                        color: '#8B8A89',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: '4px 0',
+                        flexShrink: 0
+                    }}
+                >
+                    Изменить
+                </button>
+            </div>
+
+            {/* ПРОГНОЗ */}
+            <div style={widgetStyles.hourlyRow}>
+                <div style={widgetStyles.hourItem}>
+                    <div>Утро</div>
+                    <div style={{ fontWeight: '600' }}>
+                        {weatherData.morning?.temp !== null && weatherData.morning?.temp !== undefined
+                            ? `${weatherData.morning.temp > 0 ? '+' : ''}${weatherData.morning.temp}°`
+                            : '—'}
+                    </div>
+                    <div style={{ fontSize: '12px' }}>
+                        {getWeatherEmoji(weatherData.morning?.weatherCode)}
+                    </div>
+                </div>
+                <div style={widgetStyles.hourItem}>
+                    <div>День</div>
+                    <div style={{ fontWeight: '600' }}>
+                        {weatherData.day?.temp !== null && weatherData.day?.temp !== undefined
+                            ? `${weatherData.day.temp > 0 ? '+' : ''}${weatherData.day.temp}°`
+                            : '—'}
+                    </div>
+                    <div style={{ fontSize: '12px' }}>
+                        {getWeatherEmoji(weatherData.day?.weatherCode)}
+                    </div>
+                </div>
+                <div style={widgetStyles.hourItem}>
+                    <div>Вечер</div>
+                    <div style={{ fontWeight: '600' }}>
+                        {weatherData.evening?.temp !== null && weatherData.evening?.temp !== undefined
+                            ? `${weatherData.evening.temp > 0 ? '+' : ''}${weatherData.evening.temp}°`
+                            : '—'}
+                    </div>
+                    <div style={{ fontSize: '12px' }}>
+                        {getWeatherEmoji(weatherData.evening?.weatherCode)}
+                    </div>
+                </div>
+            </div>
+        </>
+    )}
+</div>
                                     <div style={widgetStyles.calendarCard}>
                                         <div style={{ 
                                             fontSize: '11px', 
@@ -1669,7 +1787,7 @@ try {
                                                                     ...cartPageStyles.daysLeftBadge,
                                                                     color: item.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
                                                                 }}>
-                                                                    {item.days_remaining > 0 ? `${item.days_remaining} дн.` : 'Сегодня'}
+                                                                    {`${item.days_remaining} дн.`}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1728,7 +1846,7 @@ try {
                                                                     ...cartPageStyles.daysLeftBadge,
                                                                     color: outfit.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
                                                                 }}>
-                                                                    {outfit.days_remaining > 0 ? `${outfit.days_remaining} дн.` : 'Сегодня'}
+                                                                    {`${outfit.days_remaining} дн.`}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1795,7 +1913,7 @@ try {
                                                                         ...cartPageStyles.daysLeftBadge,
                                                                         color: capsule.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
                                                                     }}>
-                                                                        {capsule.days_remaining > 0 ? `${capsule.days_remaining} дн.` : 'Сегодня'}
+                                                                        {`${capsule.days_remaining} дн.`}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2157,7 +2275,47 @@ try {
 
                                             haptic('medium');
                                             setIsOutfitCreatorOpen(false);
-                                            setCurrentScreen('profile');
+
+                                            if (selectedDateForOutfit) {
+                                                // ✅ Создавали образ на конкретный день — остаёмся на главном экране
+                                                try {
+                                                    const savedOutfitId = editingOutfitId || (await response.json()).id;
+                                                    await fetch(`${API_BASE_URL}/wear-records/`, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Authorization': `Bearer ${token}`,
+                                                            'Content-Type': 'application/json'
+                                                        },
+                                                        body: JSON.stringify({
+                                                            outfit_id: savedOutfitId,
+                                                            worn_date: selectedDateForOutfit
+                                                        })
+                                                    });
+                                                    // Обновляем список записей, чтобы на главном сразу отобразился образ
+                                                    const wearRes = await fetch(`${API_BASE_URL}/wear-records/`, {
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    });
+                                                    if (wearRes.ok) {
+                                                        const records = await wearRes.json();
+                                                        setWearRecords(records);
+                                                    }
+                                                    // ✅ Показываем уведомление
+                                                    const formattedDate = new Date(selectedDateForOutfit).toLocaleDateString('ru-RU', {
+                                                        day: 'numeric',
+                                                        month: 'long'
+                                                    });
+                                                    setOutfitCreatedMessage(`Образ создан на ${formattedDate}`);
+                                                    setTimeout(() => setOutfitCreatedMessage(null), 2500);
+                                                    setSelectedDateForOutfit(null);
+                                                } catch (e) {
+                                                    console.error('Не удалось записать образ в календарь:', e);
+                                                }
+                                                // ✅ НЕ переключаем экран — остаёмся на главном
+                                            } else {
+                                                // ✅ Обычное создание образа — переключаем на экран вещей
+                                                setCurrentScreen('profile');
+                                            }
+
                                             setTimeout(() => {
                                                 setActiveDragId(null);
                                                 setCanvasItems([]);
@@ -2604,7 +2762,6 @@ try {
                                                         'Content-Type': 'application/json'
                                                     };
                                                     
-                                                    // ✅ ОТПРАВЛЯЕМ И ITEMS, И OUTFITS В ОБОИХ СЛУЧАЯХ
                                                     const payload = {
                                                         name: capsuleName || "Моя капсула",
                                                         description: null,
@@ -2613,7 +2770,7 @@ try {
                                                         outfits: capsuleOutfits.map(o => ({
                                                             name: o.name,
                                                             items: o.items.map((i: any) => ({
-                                                                clothing_id: i.id,
+                                                                clothing_item_id: i.id,
                                                                 x: i.x,
                                                                 y: i.y,
                                                                 scale: i.scale
@@ -3471,13 +3628,34 @@ try {
                         </>
                     )}
                     
+                    {outfitCreatedMessage && (
+                        <>
+                        <div style={galleryStyles.confirmBackdrop} />
+                        <div style={galleryStyles.confirmBox}>
+                        <span style={{ ...galleryStyles.confirmText, color: '#4CAF50', fontWeight: '700' }}>
+                        {outfitCreatedMessage}
+                        </span>
+                        </div>
+                        </>
+                        )}
+
                     {isOutfitPickerOpen && selectedDateForOutfit && (
                     <>
                         <div
                         onClick={() => { setIsOutfitPickerOpen(false); setSelectedDateForOutfit(null); }}
                         style={galleryStyles.confirmBackdrop}
                         />
-                        <div style={{ ...galleryStyles.confirmBox, maxHeight: '80vh', overflowY: 'auto' }}>
+                        <div 
+                        style={{ 
+                            ...galleryStyles.confirmBox, 
+                            maxHeight: '80vh', 
+                            overflowY: 'auto',
+                            overscrollBehavior: 'contain', // ✅ Предотвращает "проброс" скролла за пределы модалки
+                            touchAction: 'pan-y', // ✅ Разрешаем только вертикальный скролл внутри
+                        }}
+                        onTouchMove={(e) => e.stopPropagation()} // ✅ Останавливаем проброс touch-событий
+                        onWheel={(e) => e.stopPropagation()} // ✅ Останавливаем проброс wheel-событий
+                        >
                         <span style={{ fontSize: '16px', fontWeight: '600', color: '#151414' }}>
                             Выберите образ на {new Date(selectedDateForOutfit).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
                         </span>
@@ -3581,13 +3759,38 @@ try {
                                     fontSize: '14px',
                                     fontWeight: '600',
                                     cursor: 'pointer',
-                                    marginTop: '8px'
                                 }}
                                 >
                                 Удалить образ на этот день
                                 </button>
                         );
                         })()}
+
+                        {/* ✅ НОВАЯ КНОПКА: Создать новый образ на этот день */}
+                        <button
+                            onClick={() => {
+                                setIsOutfitPickerOpen(false);
+                                setIsOutfitCreatorOpen(true);
+                                setEditingOutfitId(null);
+                                setCanvasItems([]);
+                                setOutfitName('');
+                                haptic('medium');
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                backgroundColor: '#151414',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                boxShadow: '0px 4px 12px rgba(21, 20, 20, 0.15)'
+                            }}
+                        >
+                            + Создать новый образ на этот день
+                        </button>
                         
                         <button
                             onClick={() => { setIsOutfitPickerOpen(false); setSelectedDateForOutfit(null); }}
@@ -3600,7 +3803,7 @@ try {
                             borderRadius: '12px',
                             fontSize: '14px',
                             fontWeight: '600',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
                             }}
                         >
                             Отмена
@@ -3668,6 +3871,230 @@ try {
                             </div>
                         </>
                     )}
+
+                      {isCityPickerOpen && (
+  <>
+    <div
+      onClick={() => { setIsCityPickerOpen(false); setSearchCityQuery(''); }}
+      style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 99998
+      }}
+    />
+    <div style={{
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '85%',
+      maxWidth: '340px',
+      maxHeight: '80vh',
+      backgroundColor: '#FFFFFF',
+      borderRadius: '24px',
+      padding: '24px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px',
+      boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.15)',
+      zIndex: 99999,
+      boxSizing: 'border-box',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '16px', fontWeight: '600', color: '#151414' }}>Выберите город</span>
+        <button
+          onClick={() => { setIsCityPickerOpen(false); setSearchCityQuery(''); }}
+          style={{ background: 'none', border: 'none', fontSize: '20px', color: '#8B8A89', cursor: 'pointer', padding: '4px' }}
+        >
+          ✕
+        </button>
+      </div>
+      
+      {/* Кнопка определения геолокации */}
+      <button
+        onClick={async () => {
+        if (!navigator.geolocation) {
+            alert('Геолокация не поддерживается');
+            return;
+        }
+        setIsUpdatingLocation(true);
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            });
+            const newLat = position.coords.latitude;
+            const newLon = position.coords.longitude;
+            const newCity = await getCityName(newLat, newLon);
+            
+            // ✅ Сохраняем на бэк
+            try {
+                await fetch(`${API_BASE_URL}/weather/location`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: newLat,
+                        longitude: newLon,
+                        lat: newLat,
+                        lon: newLon,
+                        lng: newLon,
+                        city: newCity
+                    })
+                });
+                console.log('✅ [Гео] Геолокация сохранена на бэк:', newCity);
+            } catch (e) {
+                console.warn('⚠️ [Гео] Не удалось сохранить геолокацию на бэк:', e);
+            }
+
+            setIsCityPickerOpen(false);
+            
+            // ✅ Мгновенно обновляем погоду
+            await fetchWeather({ lat: newLat, lon: newLon, city: newCity });
+            haptic('medium');
+        } catch (error) {
+            console.error('Ошибка геолокации:', error);
+            alert('Не удалось определить местоположение');
+        } finally {
+            setIsUpdatingLocation(false);
+        }
+    }}
+    disabled={isUpdatingLocation}
+    style={{
+        width: '100%',
+        padding: '16px',
+        backgroundColor: '#151414',
+        color: '#FFFFFF',
+        border: 'none',
+        borderRadius: '16px',
+        fontSize: '15px',
+        fontWeight: '600',
+        cursor: isUpdatingLocation ? 'wait' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        opacity: isUpdatingLocation ? 0.7 : 1,
+        boxShadow: '0px 6px 16px rgba(21, 20, 20, 0.15)', // Красивая мягкая тень
+        transition: 'all 0.2s ease',
+        fontFamily: 'Inter, sans-serif'
+    }}
+>
+    {isUpdatingLocation ? (
+        <>
+            {/* Красивый спиннер вместо простого текста */}
+            <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderTop: '2px solid #FFFFFF',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+            }} />
+            Определяем...
+        </>
+    ) : (
+        '📍 Определить автоматически'
+    )}
+</button>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#8B8A89', fontSize: '12px' }}>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#E6E5E3' }} />
+        <span>или выберите из списка</span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#E6E5E3' }} />
+      </div>
+      
+      {/* Поиск */}
+      <input
+        type="text"
+        placeholder="Поиск города..."
+        value={searchCityQuery}
+        onChange={(e) => setSearchCityQuery(e.target.value)}
+        autoFocus
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          borderRadius: '12px',
+          border: '1px solid #E6E5E3',
+          backgroundColor: '#F9F8F6',
+          fontSize: '14px',
+          boxSizing: 'border-box',
+          outline: 'none',
+        }}
+      />
+      
+      {/* Список городов */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        maxHeight: '40vh'
+      }}>
+        {POPULAR_CITIES
+          .filter(city => city.name.toLowerCase().includes(searchCityQuery.toLowerCase()))
+          .map((city) => (
+            <button
+              key={city.name}
+              onClick={async () => {
+    // 1. Мгновенно закрываем модалку
+    setIsCityPickerOpen(false);
+    setSearchCityQuery('');
+    
+    // 2. ✅ Сохраняем на бэк
+    try {
+        await fetch(`${API_BASE_URL}/weather/location`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                latitude: city.lat,
+                longitude: city.lon,
+                lat: city.lat,
+                lon: city.lon,
+                lng: city.lon,
+                city: city.name
+            })
+        });
+        console.log('✅ [Гео] Город сохранён на бэк:', city.name);
+    } catch (e) {
+        console.warn('⚠️ [Гео] Не удалось сохранить город на бэк:', e);
+    }
+
+    // 3. ✅ Мгновенно обновляем погоду
+    await fetchWeather({ lat: city.lat, lon: city.lon, city: city.name });
+    haptic('medium');
+}}
+              style={{
+                padding: '12px 16px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E6E5E3',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textAlign: 'left',
+                color: '#151414',
+              }}
+            >
+              {city.name}
+            </button>
+          ))}
+        {POPULAR_CITIES.filter(city => city.name.toLowerCase().includes(searchCityQuery.toLowerCase())).length === 0 && (
+          <div style={{ textAlign: 'center', color: '#8B8A89', padding: '20px', fontSize: '13px' }}>
+            Город не найден
+          </div>
+        )}
+      </div>
+    </div>
+  </>
+)}
 
                     <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
                 </>
@@ -3767,141 +4194,155 @@ const ProfileGallery = ({
                         + Добавить вещь
                     </button>
                     <div style={{ ...galleryStyles.filterRow, gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
-                        <select
-                            value={selectedCategoryFilter}
-                            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                            style={galleryStyles.filterSelect}
-                            >
-                            <option value="" disabled hidden>Категория</option>
-                            <option value="">Все</option>
-                            <option value="outerwear">Верхняя одежда</option>
-                            <option value="top">Верх</option>
-                            <option value="bottom">Низ</option>
-                            <option value="shoes">Обувь</option>
-                            <option value="bags">Сумки</option>
-                            <option value="accessory">Аксессуары</option>
-                            </select>
-                        <select
-                            value={selectedSeason}
-                            onChange={(e) => setSelectedSeason(e.target.value)}
-                            style={galleryStyles.filterSelect}
-                        >
-                            <option value="" disabled hidden>Сезон</option>
-                            <option value="">Все</option>
-                            {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <select
-                            value={selectedMaterial}
-                            onChange={(e) => setSelectedMaterial(e.target.value)}
-                            style={galleryStyles.filterSelect}
-                        >
-                            <option value="" disabled hidden>Материал</option>
-                            <option value="">Все</option>
-                            {МАТЕРИАЛЫ.map((m: { id: string; name: string }) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                        </select>
-                        <div style={{ position: 'relative', width: '100%' }}>
-                            <button
-                                onClick={() => setIsColorDropdownOpen(!isColorDropdownOpen)}
-                                style={{
-                                    ...galleryStyles.filterSelect,
-                                    textAlign: 'left',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    paddingRight: '20px',
-                                    cursor: 'pointer',
-                                    width: '100%',
-                                    height: '100%',
-                                    minHeight: '31px'
-                                }}
-                            >
-                                {selectedColor ? (
-                                    <div style={{
-                                        width: '100%',
-                                        height: '8px',
-                                        borderRadius: '3px',
-                                        backgroundColor: ЦВЕТА.find(c => c.id === selectedColor)?.hex,
-                                        border: selectedColor === 'white' ? '1px solid #D4D3D1' : 'none'
-                                    }} />
-                                ) : (
-                                    <span>Цвет</span>
-                                )}
-                            </button>
-                            {isColorDropdownOpen && (
-                                <>
-                                    <div
-                                        onClick={() => setIsColorDropdownOpen(false)}
-                                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }}
-                                    />
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        right: 0,
-                                        marginTop: '4px',
-                                        backgroundColor: '#FFFFFF',
-                                        borderRadius: '10px',
-                                        boxShadow: '0px 4px 16px rgba(0,0,0,0.12)',
-                                        zIndex: 999,
-                                        maxHeight: '180px',
-                                        overflowY: 'auto',
-                                        padding: '4px',
-                                        scrollbarWidth: 'none'
-                                    }}>
-                                        <div
-                                            onClick={() => {
-                                                setSelectedColor('');
-                                                setIsColorDropdownOpen(false);
-                                                haptic('light');
-                                            }}
-                                            style={{
-                                                padding: '6px 8px',
-                                                fontSize: '11px',
-                                                fontWeight: '600',
-                                                cursor: 'pointer',
-                                                borderRadius: '6px',
-                                                color: '#151414'
-                                            }}
-                                        >
-                                            Все
-                                        </div>
-                                        {ЦВЕТА.map(c => (
-                                            <div
-                                                key={c.id}
-                                                onClick={() => {
-                                                    setSelectedColor(c.id);
-                                                    setIsColorDropdownOpen(false);
-                                                    haptic('light');
-                                                }}
-                                                style={{
-                                                    padding: '6px 8px',
-                                                    cursor: 'pointer',
-                                                    borderRadius: '6px',
-                                                    display: 'flex',
-                                                    alignItems: 'center'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: '100%',
-                                                    height: '10px',
-                                                    borderRadius: '3px',
-                                                    backgroundColor: c.hex,
-                                                    border: c.id === 'white' ? '1px solid #D4D3D1' : 'none'
-                                                }} title={c.name} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                        <button style={galleryStyles.searchCircle} onClick={() => setIsSearchOpen(true)}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="2.5" strokeLinecap="round">
-                                <circle cx="11" cy="12" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </button>
+    <select
+        value={selectedCategoryFilter}
+        onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+        style={galleryStyles.filterSelect}
+    >
+        <option value="" disabled hidden>Категория</option>
+        <option value="">Все</option>
+        {КАТЕГОРИИ.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+    </select>
+
+    <select
+        value={selectedSeason}
+        onChange={(e) => setSelectedSeason(e.target.value)}
+        style={galleryStyles.filterSelect}
+    >
+        <option value="" disabled hidden>Сезон</option>
+        <option value="">Все</option>
+        {СЕЗОНЫ.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+    </select>
+
+    <select
+        value={selectedMaterial}
+        onChange={(e) => setSelectedMaterial(e.target.value)}
+        style={galleryStyles.filterSelect}
+    >
+        <option value="" disabled hidden>Материал</option>
+        <option value="">Все</option>
+        {МАТЕРИАЛЫ.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+    </select>
+
+    {/* Кнопка выбора цвета с выпадающим списком */}
+    <div style={{ position: 'relative', width: '100%' }}>
+        <button
+onClick={() => setIsColorDropdownOpen(!isColorDropdownOpen)}
+style={{
+...galleryStyles.filterSelect,
+textAlign: 'left',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'space-between',
+paddingRight: '8px',
+cursor: 'pointer',
+width: '100%',
+height: '100%',
+minHeight: '31px',
+// ✅ Убираем стандартную стрелку из background, т.к. нарисуем свою
+backgroundImage: 'none',
+}}
+>
+{selectedColor ? (
+<div style={{
+width: '100%', height: '8px', borderRadius: '3px',
+backgroundColor: ЦВЕТА.find(c => c.id === selectedColor)?.hex
+}} />
+) : (
+<span>Цвет</span>
+)}
+{/* ✅ КАСТОМНАЯ СТРЕЛКА С АНИМАЦИЕЙ */}
+<svg
+width="12"
+height="12"
+viewBox="0 0 24 24"
+fill="none"
+stroke={isColorDropdownOpen ? '#151414' : '#8B8A89'}
+strokeWidth="2.5"
+strokeLinecap="round"
+strokeLinejoin="round"
+style={{
+transition: 'transform 0.25s ease, stroke 0.2s ease',
+transform: isColorDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+flexShrink: 0,
+marginLeft: '4px',
+}}
+>
+<polyline points="6 9 12 15 18 9" />
+</svg>
+</button>
+
+        {isColorDropdownOpen && (
+            <>
+                <div onClick={() => setIsColorDropdownOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
+                <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    boxShadow: '0px 4px 16px rgba(0,0,0,0.12)',
+                    zIndex: 999,
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    padding: '4px',
+                    scrollbarWidth: 'none'
+                }}>
+                    <div
+                        onClick={() => {
+                            setSelectedColor('');
+                            setIsColorDropdownOpen(false);
+                            haptic('light');
+                        }}
+                        style={{
+                            padding: '6px 8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            borderRadius: '6px',
+                            color: '#151414'
+                        }}
+                    >
+                        Все
                     </div>
+                    {ЦВЕТА.map(c => (
+                        <div
+                            key={c.id}
+                            onClick={() => {
+                                setSelectedColor(c.id);
+                                setIsColorDropdownOpen(false);
+                                haptic('light');
+                            }}
+                            style={{
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                        >
+                            <div style={{
+                                width: '100%',
+                                height: '10px',
+                                borderRadius: '3px',
+                                backgroundColor: c.hex,
+                                border: c.id === 'white' ? '1px solid #D4D3D1' : 'none'
+                            }} title={c.name} />
+                        </div>
+                    ))}
+                </div>
+            </>
+        )}
+    </div>
+    <button style={galleryStyles.searchCircle} onClick={() => setIsSearchOpen(true)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#151414" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="11" cy="12" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+    </button>
+</div>
                 </>
             )}
 
@@ -4358,11 +4799,12 @@ const outfitStyles: Record<string, React.CSSProperties> = {
   mainRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gridTemplateRows: '120px 145px', 
+    // ✅ УВЕЛИЧИЛИ ВТОРУЮ СТРОКУ СО 145px ДО 165px, чтобы погода не вылезала
+    gridTemplateRows: '120px 165px', 
     gap: '10px',
     width: '100%',
     boxSizing: 'border-box',
-  },
+    },
   outfitCard: {
     gridRow: '1 / span 2',
     backgroundColor: '#FFFFFF',
@@ -4411,9 +4853,11 @@ const homeStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: '0px',
+    paddingTop: '20px', // ✅ Добавили воздух сверху
+    marginTop: 'auto', // ✅ Прижимаем кнопку к самому низу экрана
     boxSizing: 'border-box',
-  },
+    flexShrink: 0, // ✅ Запрещаем кнопке сжиматься
+},
   addBtn: {
     background: 'none',
     border: 'none',
@@ -4445,41 +4889,57 @@ const homeStyles: Record<string, React.CSSProperties> = {
 
 const widgetStyles: Record<string, React.CSSProperties> = {
   weatherCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '20px',
-    padding: '10px 12px',
-    color: '#151414',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    boxSizing: 'border-box',
-    height: '100%',
-    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
-  },
-  hourlyRow: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: '20px',
+        // ✅ ЧУТЬ УВЕЛИЧИЛИ ВНУТРЕННИЕ ОТСТУПЫ
+        padding: '12px 14px', 
+        color: '#151414',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        boxSizing: 'border-box',
+        height: '100%',
+        boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+        // ✅ УБРАЛИ overflow: 'hidden', чтобы эмодзи и текст точно не обрезались краями
+    },
+    hourlyRow: {
     display: 'flex',
     justifyContent: 'space-between',
     marginTop: 'auto',
     borderTop: '0.5px solid rgba(21, 20, 20, 0.12)',
     paddingTop: '6px',
-  },
-  weatherCity: {
-    fontSize: '11px',
-    fontWeight: '600',
-    opacity: 0.9,
-  },
-  weatherTemp: {
-    fontSize: '26px',
+    gap: '4px', // ✅ Добавляем отступы
+    flexShrink: 0, // ✅ Запрещаем сжиматься
+},
+    weatherTemp: {
+    fontSize: '22px',
     fontWeight: '700',
     margin: '2px 0',
-  },
-  hourItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    whiteSpace: 'nowrap',
+    lineHeight: '1', // ✅ Добавляем фиксированную высоту строки
+    flexShrink: 0,   // ✅ Запрещаем сжиматься
+},
+hourItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    fontSize: '8.5px',
-    gap: '1px',
-  },
+    justifyContent: 'center', // ✅ Центрируем по вертикали
+    fontSize: '9px',
+    gap: '2px',
+    lineHeight: '1.2', // ✅ Фиксируем высоту строки
+    flexShrink: 0,     // ✅ Запрещаем сжиматься
+    minWidth: '40px',  // ✅ Минимальная ширина
+},
+weatherCity: {
+    fontSize: '11px',
+    fontWeight: '600',
+    opacity: 0.9,
+    lineHeight: '1.2', // ✅ Добавляем
+    flexShrink: 0,     // ✅ Добавляем
+},
   calendarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: '20px',
@@ -4665,7 +5125,10 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     zIndex: 99999,
     boxSizing: 'border-box',
     textAlign: 'center',
-  },
+    // ✅ ДОБАВЛЯЕМ:
+    alignItems: 'center',
+    justifyContent: 'center',
+},
   confirmText: {
     fontSize: '16px',
     fontWeight: '500',
@@ -4676,8 +5139,10 @@ const galleryStyles: Record<string, React.CSSProperties> = {
   confirmActions: {
     display: 'flex',
     gap: '10px',
-  },
-  confirmDeleteBtn: {
+    width: '100%', // ✅ Фиксируем ширину
+    flexShrink: 0, // ✅ Запрещаем сжиматься
+},
+confirmDeleteBtn: {
     flex: 1,
     padding: '14px',
     backgroundColor: '#E57373',
@@ -4687,8 +5152,10 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
-  },
-  confirmCancelBtn: {
+    lineHeight: '1', // ✅ Фиксируем
+    whiteSpace: 'nowrap', // ✅ Запрещаем перенос
+},
+confirmCancelBtn: {
     flex: 1,
     padding: '14px',
     backgroundColor: '#E6E5E3',
@@ -4698,7 +5165,9 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
-  },
+    lineHeight: '1', // ✅ Фиксируем
+    whiteSpace: 'nowrap', // ✅ Запрещаем перенос
+},
   tabsAndSearch: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -4706,32 +5175,35 @@ const galleryStyles: Record<string, React.CSSProperties> = {
     marginBottom: '20px',
   },
   filterRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr auto',
-    gap: '8px',
-    marginBottom: '16px',
-    alignItems: 'center',
-  },
-  filterSelect: {
-    width: '100%',
-    padding: '8px 24px 8px 8px',
-    borderRadius: '10px',
-    border: 'none',
-    backgroundColor: '#FFFFFF',
-    fontSize: '11px',
-    color: '#151414',
-    outline: 'none',
-    cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
-    boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
-    textAlign: 'left',
-    appearance: 'none',
-    WebkitAppearance: 'none',
-    MozAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23151414' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 8px center',
-  },
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
+  gap: '8px',
+  marginBottom: '16px',
+  alignItems: 'center',
+},
+filterSelect: {
+  width: '100%',
+  height: '31px',
+  boxSizing: 'border-box',
+  padding: '0 28px 0 8px',
+  borderRadius: '10px',
+  border: 'none',
+  backgroundColor: '#FFFFFF',
+  fontSize: '12px', // Тот самый размер, который делает фильтры одинаковыми
+  color: '#151414',
+  outline: 'none',
+  cursor: 'pointer',
+  fontFamily: 'Inter, sans-serif',
+  boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
+  textAlign: 'left',
+  appearance: 'none',
+  // Стрелочка для select
+  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B8A89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+backgroundRepeat: 'no-repeat',
+backgroundPosition: 'right 8px center',
+backgroundSize: '12px',
+transition: 'background-image 0.2s ease, transform 0.2s ease',
+},
   searchCircle: {
     flexShrink: 0,
     width: '36px',
