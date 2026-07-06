@@ -383,60 +383,68 @@ const POPULAR_CITIES = [
 ];
 
 interface OutfitRendererProps {
-    items: any[];
-    containerWidth: number;
-    showBorder?: boolean;
-    backgroundColor?: string;
+  items: any[];
+  containerWidth: number;
+  showBorder?: boolean;
+  backgroundColor?: string; // <-- Добавили это поле
 }
 
 const OutfitRenderer = ({
     items = [],
     containerWidth,
     showBorder = false,
-    backgroundColor = '#F5F5F4',
+    backgroundColor = 'transparent',
     }: OutfitRendererProps) => {
     const DESIGN_WIDTH = 315;
     const DESIGN_HEIGHT = 480;
     const scale = containerWidth / DESIGN_WIDTH;
+
     return (
-    <div
+        <div
         style={{
             width: containerWidth,
             height: DESIGN_HEIGHT * scale,
             overflow: "hidden",
             position: "relative",
             border: showBorder ? "2px solid #151414" : "none",
-            backgroundColor: backgroundColor, // <-- Применяем фон
             borderRadius: "16px",
             boxSizing: "border-box",
+            backgroundColor,
         }}
         >
-    <div
-        style={{
+        <div
+            style={{
             width: DESIGN_WIDTH,
             height: DESIGN_HEIGHT,
             position: "relative",
             transform: `scale(${scale})`,
             transformOrigin: "top left",
-        }}
-    >
-    {items.map((item: any, index: number) => (
-        <img
-            key={`${item.id}-${index}`}
-            src={item.img}
-            alt=""
-            style={{
-            position: "absolute",
-            left: item.x,
-            top: item.y,
-            width: 110 * (item.scale || 1),
-            height: 110 * (item.scale || 1),
-            objectFit: "contain",
-        }}
-        />
-    ))}
-    </div>
-    </div>
+            }}
+        >
+            {items.map((item: any, index: number) => (
+            <div
+                key={`${item.id}-${index}`}
+                style={{
+                position: "absolute",
+                left: item.x,
+                top: item.y,
+                transform: `scale(${item.scale || 1})`,
+                transformOrigin: "center center",
+                }}
+            >
+                <img
+                src={item.img}
+                alt=""
+                style={{
+                    width: 110,
+                    objectFit: "contain",
+                    display: "block",
+                }}
+                />
+            </div>
+            ))}
+        </div>
+        </div>
     );
 };
 
@@ -3536,7 +3544,6 @@ background-size: 12px !important;
                 <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
             </div>
             
-            {/* Вот здесь теперь отображается точная уменьшенная копия */}
             <div style={{ width: '240px', margin: '0 auto' }}>
                 <OutfitRenderer 
                     items={selectedOutfitForView.items} 
