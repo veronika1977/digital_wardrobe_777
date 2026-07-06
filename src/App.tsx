@@ -19,6 +19,7 @@ interface WardrobeItem {
     image_url?: string | null;
     createdAt?: string;
     deletedAt: string | null;
+    last_worn_at: string | null;
 }
 interface PositionedItem extends WardrobeItem {
     x: number;
@@ -386,66 +387,66 @@ interface OutfitRendererProps {
   items: any[];
   containerWidth: number;
   showBorder?: boolean;
-  backgroundColor?: string; // <-- Добавили это поле
+  backgroundColor?: string;
 }
 
 const OutfitRenderer = ({
-    items = [],
-    containerWidth,
-    showBorder = false,
-    backgroundColor = 'transparent',
-    }: OutfitRendererProps) => {
-    const DESIGN_WIDTH = 315;
-    const DESIGN_HEIGHT = 480;
-    const scale = containerWidth / DESIGN_WIDTH;
+  items = [],
+  containerWidth,
+  showBorder = false,
+  backgroundColor = 'transparent',
+}: OutfitRendererProps) => {
+  const DESIGN_WIDTH = 315;
+  const DESIGN_HEIGHT = 480;
+  const scale = containerWidth / DESIGN_WIDTH;
 
-    return (
-        <div
+  return (
+    <div
+      style={{
+        width: containerWidth,
+        height: DESIGN_HEIGHT * scale,
+        overflow: "hidden",
+        position: "relative",
+        border: showBorder ? "2px solid #151414" : "none",
+        borderRadius: "16px",
+        boxSizing: "border-box",
+        backgroundColor,
+      }}
+    >
+      <div
         style={{
-            width: containerWidth,
-            height: DESIGN_HEIGHT * scale,
-            overflow: "hidden",
-            position: "relative",
-            border: showBorder ? "2px solid #151414" : "none",
-            borderRadius: "16px",
-            boxSizing: "border-box",
-            backgroundColor,
+          width: DESIGN_WIDTH,
+          height: DESIGN_HEIGHT,
+          position: "relative",
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
         }}
-        >
-        <div
+      >
+        {items.map((item: any, index: number) => (
+          <div
+            key={`${item.id}-${index}`}
             style={{
-            width: DESIGN_WIDTH,
-            height: DESIGN_HEIGHT,
-            position: "relative",
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
+              position: "absolute",
+              left: item.x,
+              top: item.y,
+              transform: `scale(${item.scale || 1})`,
+              transformOrigin: "center center",
             }}
-        >
-            {items.map((item: any, index: number) => (
-            <div
-                key={`${item.id}-${index}`}
-                style={{
-                position: "absolute",
-                left: item.x,
-                top: item.y,
-                transform: `scale(${item.scale || 1})`,
-                transformOrigin: "center center",
-                }}
-            >
-                <img
-                src={item.img}
-                alt=""
-                style={{
-                    width: 110,
-                    objectFit: "contain",
-                    display: "block",
-                }}
-                />
-            </div>
-            ))}
-        </div>
-        </div>
-    );
+          >
+            <img
+              src={item.img}
+              alt=""
+              style={{
+                width: 110,
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 function App() {
@@ -523,6 +524,8 @@ function App() {
     const [isCapsuleOutfitItemPickerOpen, setIsCapsuleOutfitItemPickerOpen] = useState(false);
     const [outfitName, setOutfitName] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
+    const [isWearTodayPickerOpen, setIsWearTodayPickerOpen] = useState(false);
+    const [wearTodayItems, setWearTodayItems] = useState<number[]>([]);
 
     const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
         setDeleteConfirm({ id, type });
@@ -621,6 +624,19 @@ function App() {
         } finally {
             setIsCartLoading(false);
         }
+    };
+
+    const formatWornDate = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffTime = today.getTime() - date.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) return 'Сегодня';
+        if (diffDays === 1) return 'Вчера';
+        if (diffDays < 7) return `${diffDays} дн. назад`;
+        return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     };
 
     const uploadImageAndGetUrl = async (base64Image: string) => {
@@ -830,7 +846,7 @@ function App() {
                 LAT = forcedLocation.lat;
                 LON = forcedLocation.lon;
                 city = forcedLocation.city;
-                console.log('✅ [Гео] Используем принудительно переданный город:', city, LAT, LON);
+                console.log('[Гео] Используем принудительно переданный город:', city, LAT, LON);
             } else {
                 try {
                     const locationRes = await fetch(`${API_BASE_URL}/weather/location`, {
@@ -838,24 +854,24 @@ function App() {
                     });
                     if (locationRes.ok) {
                         const locData = await locationRes.json();
-                        console.log('🔍 [Гео] Сырые данные с бэка:', JSON.stringify(locData));
+                        console.log('[Гео] Сырые данные с бэка:', JSON.stringify(locData));
                         const lat = locData?.latitude ?? locData?.lat ?? locData?.data?.latitude ?? locData?.data?.lat;
                         const lon = locData?.longitude ?? locData?.lon ?? locData?.lng ?? locData?.data?.longitude ?? locData?.data?.lon ?? locData?.data?.lng;
                         if (lat !== undefined && lat !== null && lon !== undefined && lon !== null) {
                             LAT = Number(lat);
                             LON = Number(lon);
                             city = locData?.city ?? locData?.data?.city ?? locData?.name ?? '';
-                            console.log('✅ [Гео] Загружено с бэкенда:', LAT, LON, city);
+                            console.log('[Гео] Загружено с бэкенда:', LAT, LON, city);
                         }
                     } else {
-                        console.warn('⚠️ [Гео] Бэк вернул статус:', locationRes.status);
+                        console.warn('[Гео] Бэк вернул статус:', locationRes.status);
                     }
                 } catch (e) {
-                    console.warn('⚠️ [Гео] Ошибка запроса к бэку:', e);
+                    console.warn('[Гео] Ошибка запроса к бэку:', e);
                 }
 
                 if (!LAT || !LON) {
-                    console.warn('⚠️ [Гео] На бэке нет данных о локации. Показываем заглушку.');
+                    console.warn('[Гео] На бэке нет данных о локации. Показываем заглушку.');
                     setWeatherData(null);
                     setIsLoadingWeather(false);
                     return;
@@ -1060,6 +1076,23 @@ function App() {
     };
 
     useEffect(() => {
+    if (clothes.length === 0) return;
+    
+    const tg = (window as any).Telegram?.WebApp;
+    const startParam = tg?.initDataUnsafe?.start_param;
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+
+    if (startParam === 'wear_today' || action === 'wear_today') {
+        setIsWearTodayPickerOpen(true);
+        haptic('medium');
+        if (window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+    }, [clothes.length]);
+
+    useEffect(() => {
         if (restoreSuccess) {
             const timer = setTimeout(() => {
                 setRestoreSuccess(null);
@@ -1077,37 +1110,37 @@ function App() {
     useEffect(() => {
         const styleTag = document.createElement('style');
         styleTag.textContent = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
-@keyframes spin {
-0% { transform: rotate(0deg); }
-100% { transform: rotate(360deg); }
-}
-body, button, input, select, textarea, span, div {
-font-family: 'Inter', sans-serif !important;
-}
-.fancy-serif {
-font-family: 'Playfair Display', serif !important;
-font-style: normal !important;
-font-weight: 400 !important;
-letter-spacing: 0.5px !important;
-text-transform: uppercase;
-}
-h1.fancy-serif {
-letter-spacing: 1.5px !important;
-}
-[style*="dayNumber"], [style*="calendarDaysHeader"] span {
-font-family: 'Inter', sans-serif !important;
-font-style: normal !important;
-letter-spacing: normal !important;
-font-weight: 500 !important;
-}
-select:focus {
-background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23151414' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 15 12 9 18 15'></polyline></svg>") !important;
-background-repeat: no-repeat !important;
-background-position: right 8px center !important;
-background-size: 12px !important;
-}
-`;
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+        @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+        }
+        body, button, input, select, textarea, span, div {
+        font-family: 'Inter', sans-serif !important;
+        }
+        .fancy-serif {
+        font-family: 'Playfair Display', serif !important;
+        font-style: normal !important;
+        font-weight: 400 !important;
+        letter-spacing: 0.5px !important;
+        text-transform: uppercase;
+        }
+        h1.fancy-serif {
+        letter-spacing: 1.5px !important;
+        }
+        [style*="dayNumber"], [style*="calendarDaysHeader"] span {
+        font-family: 'Inter', sans-serif !important;
+        font-style: normal !important;
+        letter-spacing: normal !important;
+        font-weight: 500 !important;
+        }
+        select:focus {
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23151414' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 15 12 9 18 15'></polyline></svg>") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 8px center !important;
+        background-size: 12px !important;
+        }
+        `;
         document.body.style.backgroundColor = '#edecea';
         document.body.style.color = '#151414';
         document.body.style.overflow = 'hidden';
@@ -1143,7 +1176,8 @@ background-size: 12px !important;
                         season: item.season,
                         material: item.material,
                         img: getFullImageUrl(item.image_url),
-                        deletedAt: item.deleted_at ? new Date(item.deleted_at).toISOString() : null
+                        deletedAt: item.deleted_at ? new Date(item.deleted_at).toISOString() : null,
+                        last_worn_at: item.last_worn_at || null
                     }));
                     setClothes(mappedClothes);
                 }
@@ -1202,75 +1236,84 @@ background-size: 12px !important;
                 const capsulesRes = await fetch(`${API_BASE_URL}/capsules/`, { headers });
                 if (capsulesRes.ok) {
                     const rawCapsules = await capsulesRes.json();
-                    const mappedCapsules = rawCapsules.map((c: any) => {
-                        const mappedItems = (c.items || []).map((item: any) => {
-                            const cId = typeof item === 'number' || typeof item === 'string' ? item : (item.id || item.clothing_id);
-                            let img = typeof item === 'object' && item.image_url ? getFullImageUrl(item.image_url) : null;
-                            if (!img) {
-                                const cloth = mappedClothes.find(cl => String(cl.id) === String(cId));
-                                img = cloth?.img || '/placeholder.png';
-                            }
-                            return {
-                                id: cId,
-                                img: img,
-                                name: (typeof item === 'object' ? item.name : '') || (mappedClothes.find(cl => String(cl.id) === String(cId))?.name || '')
-                            };
-                        });
-                        const mappedOutfits = (c.outfits || []).map((o: any) => ({
-                            ...o,
-                            items: (o.items || []).map((item: any) => {
-                                const cId = item.clothing_id || item.id;
+                    
+                    const mappedCapsules = await Promise.all(rawCapsules.map(async (c: any) => {
+                    let capsuleOutfits: any[] = [];
+                    try {
+                        const outfitsRes = await fetch(`${API_BASE_URL}/outfits/?capsule_id=${c.id}`, { headers });
+                        if (outfitsRes.ok) {
+                        const rawOutfits = await outfitsRes.json();
+                        capsuleOutfits = await Promise.all(rawOutfits.map(async (o: any) => {
+                            let outfitItems: any[] = [];
+                            try {
+                            const itemsRes = await fetch(`${API_BASE_URL}/outfits/${o.id}/items`, { headers });
+                            if (itemsRes.ok) {
+                                const rawItems = await itemsRes.json();
+                                outfitItems = rawItems.map((item: any) => {
+                                const cId = item.clothing_item_id || item.clothing_id || item.id;
                                 const cloth = mappedClothes.find(cl => String(cl.id) === String(cId));
                                 return {
                                     ...item,
                                     id: cId,
+                                    outfit_item_id: item.id,
                                     img: getFullImageUrl(item.image_url || cloth?.img || '/placeholder.png'),
                                     x: item.x || 0,
                                     y: item.y || 0,
                                     scale: item.scale || 1
                                 };
-                            })
+                                });
+                            }
+                            } catch (e) {
+                            console.error(`Не удалось загрузить вещи для образа ${o.id}:`, e);
+                            }
+                            return {
+                            ...o,
+                            createdAt: o.created_at || o.createdAt,
+                            deletedAt: o.deleted_at || o.deletedAt,
+                            items: outfitItems,
+                            capsule_name: c.name,
+                            capsule_id: c.id
+                            };
                         }));
+                        }
+                    } catch (e) {
+                        console.error(`Не удалось загрузить аутфиты для капсулы ${c.id}:`, e);
+                    }
+                    
+                    const mappedItems = (c.items || []).map((item: any) => {
+                        const cId = typeof item === 'number' || typeof item === 'string' ? item : (item.id || item.clothing_id);
+                        let img = typeof item === 'object' && item.image_url ? getFullImageUrl(item.image_url) : null;
+                        if (!img) {
+                        const cloth = mappedClothes.find(cl => String(cl.id) === String(cId));
+                        img = cloth?.img || '/placeholder.png';
+                        }
                         return {
-                            ...c,
-                            createdAt: c.created_at || c.createdAt,
-                            deletedAt: c.is_deleted ? (c.deleted_at || new Date().toISOString()) : null,
-                            items: mappedItems,
-                            outfits: mappedOutfits
+                        id: cId,
+                        img: img,
+                        name: (typeof item === 'object' ? item.name : '') || (mappedClothes.find(cl => String(cl.id) === String(cId))?.name || '')
                         };
                     });
+                    
+                    return {
+                        ...c,
+                        createdAt: c.created_at || c.createdAt,
+                        deletedAt: c.is_deleted ? (c.deleted_at || new Date().toISOString()) : null,
+                        items: mappedItems,
+                        outfits: capsuleOutfits
+                    };
+                    }));
+                    
                     setCapsules(mappedCapsules);
+                    
+                    const allCapsuleOutfits = mappedCapsules.flatMap((c: any) => c.outfits || []);
+                    setOutfits(prev => [...prev, ...allCapsuleOutfits]);
                 }
-            } catch (error) {
+                } catch (error) {
                 console.error('Ошибка загрузки данных:', error);
                 if (isNetworkError(error)) {
                     setNetworkError(true);
                 }
-            }
-            try {
-                const wearRes = await fetch(`${API_BASE_URL}/wear-records/`, { headers });
-                if (wearRes.ok) {
-                    const records = await wearRes.json();
-                    setWearRecords(records);
                 }
-            } catch (error) {
-                console.error('Ошибка загрузки данных:', error);
-                if (isNetworkError(error)) {
-                    setNetworkError(true);
-                }
-            }
-            try {
-                const wearRes = await fetch(`${API_BASE_URL}/wear-records/`, { headers });
-                if (wearRes.ok) {
-                    const records = await wearRes.json();
-                    setWearRecords(records);
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки данных:', error);
-                if (isNetworkError(error)) {
-                    setNetworkError(true);
-                }
-            }
         };
         fetchAllData();
         fetchWeather();
@@ -1354,29 +1397,29 @@ background-size: 12px !important;
                                 <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Образ сегодня</h2>
                                 <div style={outfitStyles.mainRow}>
                                     <div style={outfitStyles.outfitCard}>
-                                    {(() => {
-                                    const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
-                                    const todayRecord = wearRecords.find(r => r.worn_date === todayStr);
-                                    const todayOutfit = todayRecord ? outfits.find(o => o.id === todayRecord.outfit_id) : null;
-                                    if (todayOutfit) {
-                                    return (
-                                    <OutfitRenderer
-                                    items={todayOutfit.items}
-                                    containerWidth={140} // Оптимальная ширина для заполнения карточки
-                                    backgroundColor="#F9F8F6" // Легкий теплый фон, имитирующий фото
-                                    />
-                                    );
-                                    }
-                                    return (
-                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <div style={outfitStyles.emptyGrid}>
-                                    <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
-                                    Нет образа на сегодня
-                                    </span>
-                                    </div>
-                                    </div>
-                                    );
-                                    })()}
+                                        {(() => {
+                                        const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+                                        const todayRecord = wearRecords.find(r => r.worn_date === todayStr);
+                                        const todayOutfit = todayRecord ? outfits.find(o => o.id === todayRecord.outfit_id) : null;
+                                        if (todayOutfit) {
+                                        return (
+                                        <OutfitRenderer
+                                        items={todayOutfit.items}
+                                        containerWidth={140}
+                                        backgroundColor="#F9F8F6"
+                                        />
+                                        );
+                                        }
+                                        return (
+                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={outfitStyles.emptyGrid}>
+                                        <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
+                                        Нет образа на сегодня
+                                        </span>
+                                        </div>
+                                        </div>
+                                        );
+                                        })()}
                                     </div>
                                     <div style={widgetStyles.weatherCard}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -2024,17 +2067,8 @@ background-size: 12px !important;
                                                         <img src={cartItemModal.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                                                     )}
                                                     {cartItemModal.type === 'outfits' && (
-                                                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                                            {(cartItemModal.items || []).map((item: any, idx: number) => {
-                                                                const factor = 0.45;
-                                                                return (
-                                                                    <img key={idx} src={item.img} style={{
-                                                                        position: 'absolute', left: `${item.x * factor}px`, top: `${item.y * factor}px`,
-                                                                        width: `${110 * factor * (item.scale || 1)}px`, height: `${110 * factor * (item.scale || 1)}px`,
-                                                                        objectFit: 'contain'
-                                                                    }} alt="" />
-                                                                );
-                                                            })}
+                                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <OutfitRenderer items={selectedItemForView.items || cartItemModal.items || []} containerWidth={140} />
                                                         </div>
                                                     )}
                                                     {cartItemModal.type === 'capsules' && (
@@ -2178,6 +2212,7 @@ background-size: 12px !important;
                     </div>
                 </>
             )}
+
             {isOutfitCreatorOpen && (
                 <div
                     style={{
@@ -2479,6 +2514,7 @@ background-size: 12px !important;
                     </div>
                 </div>
             )}
+
             {isItemPickerOpen && (
                 <div
                     onClick={() => { setIsItemPickerOpen(false); setPickerCategory('all'); }}
@@ -2565,6 +2601,112 @@ background-size: 12px !important;
                     </div>
                 </div>
             )}
+
+            {isWearTodayPickerOpen && (
+                <div 
+                    onClick={() => setIsWearTodayPickerOpen(false)} 
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
+                >
+                    <div 
+                        onClick={e => e.stopPropagation()} 
+                        style={{ 
+                            position: 'absolute', bottom: 0, left: 0, right: 0, height: '75vh', 
+                            backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px', 
+                            display: 'flex', flexDirection: 'column', boxSizing: 'border-box' 
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <span style={{ fontWeight: '600', fontSize: '18px', color: '#151414' }}>Что вы носили сегодня?</span>
+                            <button 
+                                onClick={() => setIsWearTodayPickerOpen(false)} 
+                                style={{ background: 'none', border: 'none', fontSize: '15px', fontWeight: '600', color: '#8B8A89', cursor: 'pointer' }}
+                            >
+                                Отмена
+                            </button>
+                        </div>
+                        
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
+                            {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
+                                const isSelected = wearTodayItems.includes(item.id);
+                                return (
+                                    <div 
+                                        key={item.id} 
+                                        onClick={() => {
+                                            if (isSelected) setWearTodayItems(wearTodayItems.filter(id => id !== item.id));
+                                            else setWearTodayItems([...wearTodayItems, item.id]);
+                                            haptic('light');
+                                        }} 
+                                        style={{ 
+                                            aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative', 
+                                            border: isSelected ? '3px solid #4CAF50' : '1px solid #E6E5E3', 
+                                            opacity: isSelected ? 0.8 : 1, cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                        {isSelected && (
+                                            <div style={{ 
+                                                position: 'absolute', top: '6px', right: '6px', backgroundColor: '#4CAF50', 
+                                                color: '#fff', borderRadius: '50%', width: '24px', height: '24px', 
+                                                fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                            }}>✓</div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <button 
+                            onClick={async () => {
+                                if (wearTodayItems.length === 0) { 
+                                    alert('Выберите хотя бы одну вещь'); 
+                                    return; 
+                                }
+                                const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+                                
+                                try {
+                                    await Promise.all(wearTodayItems.map(itemId => 
+                                        fetch(`${API_BASE_URL}/clothes/${itemId}`, {
+                                            method: 'PATCH',
+                                            headers: { 
+                                                'Authorization': `Bearer ${token}`, 
+                                                'Content-Type': 'application/json' 
+                                            },
+                                            body: JSON.stringify({ last_worn_at: todayStr })
+                                        })
+                                    ));
+                                    
+                                    setClothes(prev => prev.map(item => 
+                                        wearTodayItems.includes(item.id) 
+                                            ? { ...item, last_worn_at: todayStr } 
+                                            : item
+                                    ));
+
+                                    haptic('medium');
+                                    setIsWearTodayPickerOpen(false);
+                                    setWearTodayItems([]);
+                                    
+                                    setRestoreSuccess('Спасибо! Дата носки обновлена 🎉');
+                                    setTimeout(() => setRestoreSuccess(null), 3000);
+                                    
+                                } catch (e) {
+                                    console.error(e);
+                                    alert('Не удалось сохранить запись');
+                                }
+                            }} 
+                            style={{ 
+                                width: '100%', padding: '16px', backgroundColor: '#4CAF50', color: '#FFFFFF', 
+                                border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', 
+                                cursor: 'pointer', marginTop: '10px', boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)'
+                            }}
+                        >
+                            Сохранить ({wearTodayItems.length})
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {isCapsuleCreatorOpen && (
                 <div
                     style={{
@@ -2777,81 +2919,116 @@ background-size: 12px !important;
                                 <button
                                     onClick={async () => {
                                         try {
-                                            setIsSavingCapsule(true);
-                                            const headers = {
-                                                'Authorization': `Bearer ${token}`,
-                                                'Content-Type': 'application/json'
-                                            };
-                                            const payload = {
-                                                name: capsuleName || "Моя капсула",
-                                                description: null,
-                                                season: null,
-                                                items: capsuleItems.map(i => i.id),
-                                                outfits: capsuleOutfits.map(o => ({
-                                                    name: o.name,
-                                                    items: o.items.map((i: any) => ({
-                                                        clothing_item_id: i.id,
-                                                        x: i.x,
-                                                        y: i.y,
-                                                        scale: i.scale
-                                                    }))
-                                                }))
-                                            };
-                                            let response;
-                                            if (editingCapsuleId) {
-                                                response = await fetch(`${API_BASE_URL}/capsules/${editingCapsuleId}`, {
-                                                    method: 'PATCH',
-                                                    headers,
-                                                    body: JSON.stringify(payload)
-                                                });
-                                            } else {
-                                                response = await fetch(`${API_BASE_URL}/capsules/`, {
-                                                    method: 'POST',
-                                                    headers,
-                                                    body: JSON.stringify(payload)
-                                                });
-                                            }
-                                            if (!response.ok) throw new Error('Ошибка сохранения капсулы');
-                                            const savedCapsule = await response.json();
-                                            const mappedCapsule = {
-                                                ...savedCapsule,
-                                                createdAt: savedCapsule.created_at,
-                                                deletedAt: savedCapsule.is_deleted ? (savedCapsule.deleted_at || new Date().toISOString()) : null,
-                                                items: (savedCapsule.items || []).map((ci: any) => {
-                                                    const cId = typeof ci === 'number' ? ci : (ci.id || ci.clothing_item_id);
-                                                    const cloth = clothes.find(c => c.id === cId);
-                                                    return { id: cId, img: cloth?.img || '/placeholder.png', name: cloth?.name || '' };
-                                                }),
-                                                outfits: (savedCapsule.outfits || []).map((o: any) => ({
-                                                    ...o,
-                                                    items: (o.items || []).map((oi: any) => {
-                                                        const cId = oi.clothing_id || oi.id;
-                                                        const cloth = clothes.find(c => c.id === cId);
-                                                        return {
-                                                            ...oi,
-                                                            id: cId,
-                                                            img: getFullImageUrl(cloth?.img || '/placeholder.png'),
-                                                            x: oi.x || 0,
-                                                            y: oi.y || 0,
-                                                            scale: oi.scale || 1
-                                                        };
-                                                    })
-                                                }))
-                                            };
-                                            if (editingCapsuleId) {
-                                                setCapsules(capsules.map(c => c.id === editingCapsuleId ? mappedCapsule : c));
-                                            } else {
-                                                setCapsules([mappedCapsule, ...capsules]);
-                                            }
-                                            haptic('medium');
-                                            setIsCapsuleCreatorOpen(false);
-                                        } catch (e) {
-                                            console.error(e);
-                                            const errorMessage = e instanceof Error ? e.message : 'Произошла неизвестная ошибка';
-                                            alert('Не удалось сохранить капсулу: ' + errorMessage);
-                                        } finally {
-                                            setIsSavingCapsule(false);
+                                        setIsSavingCapsule(true);
+                                        const headers = {
+                                            'Authorization': `Bearer ${token}`,
+                                            'Content-Type': 'application/json'
+                                        };
+                                        
+                                        const payload = {
+                                            name: capsuleName || "Моя капсула",
+                                            description: null,
+                                            season: null,
+                                            items: capsuleItems.map(i => i.id)
+                                        };
+                                        
+                                        let response;
+                                        if (editingCapsuleId) {
+                                            response = await fetch(`${API_BASE_URL}/capsules/${editingCapsuleId}`, {
+                                            method: 'PATCH',
+                                            headers,
+                                            body: JSON.stringify(payload)
+                                            });
+                                        } else {
+                                            response = await fetch(`${API_BASE_URL}/capsules/`, {
+                                            method: 'POST',
+                                            headers,
+                                            body: JSON.stringify(payload)
+                                            });
                                         }
+                                        
+                                        if (!response.ok) throw new Error('Ошибка сохранения капсулы');
+                                        const savedCapsule = await response.json();
+                                        const savedCapsuleId = savedCapsule.id;
+                                        
+                                        for (const outfit of capsuleOutfits) {
+                                            const outfitPayload = {
+                                            name: outfit.name,
+                                            capsule_id: savedCapsuleId,
+                                            items: outfit.items.map((i: any) => ({
+                                                clothing_item_id: i.id,
+                                                x: i.x,
+                                                y: i.y,
+                                                scale: i.scale
+                                            }))
+                                            };
+                                            
+                                            const outfitRes = await fetch(`${API_BASE_URL}/outfits/`, {
+                                            method: 'POST',
+                                            headers,
+                                            body: JSON.stringify(outfitPayload)
+                                            });
+                                            
+                                            if (!outfitRes.ok) {
+                                            console.error(`Не удалось сохранить образ "${outfit.name}"`);
+                                            }
+                                        }
+                                        
+                                        const capsuleRes = await fetch(`${API_BASE_URL}/capsules/${savedCapsuleId}`, {
+                                            headers: { 'Authorization': `Bearer ${token}` }
+                                        });
+                                        
+                                        if (capsuleRes.ok) {
+                                            const data = await capsuleRes.json();
+                                            const mappedCapsule = {
+                                            ...data,
+                                            id: data.id,
+                                            name: data.name,
+                                            createdAt: data.created_at || data.createdAt,
+                                            deletedAt: data.is_deleted ? (data.deleted_at || new Date().toISOString()) : null,
+                                            items: (data.items || []).map((ci: any) => {
+                                                const cId = ci.id;
+                                                const cloth = clothes.find(c => c.id === cId);
+                                                return { 
+                                                id: cId, 
+                                                img: cloth?.img || '/placeholder.png', 
+                                                name: cloth?.name || '' 
+                                                };
+                                            }),
+                                            outfits: (data.outfits || []).map((o: any) => ({
+                                                ...o,
+                                                items: (o.items || []).map((oi: any) => {
+                                                const cId = oi.clothing_item_id || oi.clothing_id || oi.id;
+                                                const cloth = clothes.find(c => c.id === cId);
+                                                return {
+                                                    ...oi,
+                                                    id: cId,
+                                                    img: getFullImageUrl(cloth?.img || '/placeholder.png'),
+                                                    x: oi.x || 0,
+                                                    y: oi.y || 0,
+                                                    scale: oi.scale || 1
+                                                };
+                                                })
+                                            }))
+                                            };
+                                            
+                                            if (editingCapsuleId) {
+                                            setCapsules(capsules.map(c => c.id === editingCapsuleId ? mappedCapsule : c));
+                                            } else {
+                                            setCapsules([mappedCapsule, ...capsules]);
+                                            }
+                                        }
+                                        
+                                        haptic('medium');
+                                        setIsCapsuleCreatorOpen(false);
+                                        } catch (e) {
+                                        console.error(e);
+                                        const errorMessage = e instanceof Error ? e.message : 'Произошла неизвестная ошибка';
+                                        alert('Не удалось сохранить капсулу: ' + errorMessage);
+                                        } finally {
+                                        setIsSavingCapsule(false);
+                                        }
+                                        
                                         setCapsuleItems([]);
                                         setCapsuleName('');
                                         setCapsuleOutfits([]);
@@ -2862,9 +3039,9 @@ background-size: 12px !important;
                                         background: 'none', border: 'none', fontSize: '16px', fontWeight: '600',
                                         color: '#6B6A69', opacity: isSavingCapsule ? 0.5 : 1, cursor: isSavingCapsule ? 'wait' : 'pointer'
                                     }}
-                                >
+                                    >
                                     {isSavingCapsule ? 'Сохранение...' : 'Сохранить'}
-                                </button>
+                                    </button>
                             </div>
                             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
                                 <span style={outfitStyles.sectionTitle} className="fancy-serif">
@@ -2879,39 +3056,33 @@ background-size: 12px !important;
                                         {capsuleOutfits.map((outfit) => (
                                             <div key={outfit.id} style={{ ...galleryStyles.card, position: 'relative' }}>
                                                 <button
-                                                    onClick={() => setCapsuleOutfits(capsuleOutfits.filter(o => o.id !== outfit.id))}
+                                                    onClick={async () => {
+                                                        if (editingCapsuleId && outfit.id > 1000000) { // ID > 1000000 — это реальный ID с бэка
+                                                        try {
+                                                            const response = await fetch(
+                                                            `${API_BASE_URL}/capsules/${editingCapsuleId}/outfits/${outfit.id}`, 
+                                                            {
+                                                                method: 'DELETE',
+                                                                headers: { 'Authorization': `Bearer ${token}` }
+                                                            }
+                                                            );
+                                                            
+                                                            if (!response.ok) throw new Error('Ошибка удаления');
+                                                        } catch (e) {
+                                                            console.error(e);
+                                                            alert('Не удалось удалить образ');
+                                                            return;
+                                                        }
+                                                        }
+                                                        
+                                                        setCapsuleOutfits(capsuleOutfits.filter(o => o.id !== outfit.id));
+                                                        haptic('light');
+                                                    }}
                                                     style={galleryStyles.deleteBadge}
-                                                >
+                                                    >
                                                     ✕
-                                                </button>
-                                                <div style={{
-                                                    width: '105px',
-                                                    height: '160px',
-                                                    backgroundColor: 'transparent',
-                                                    position: 'relative',
-                                                    overflow: 'hidden',
-                                                    flexShrink: 0,
-                                                    margin: '0 auto'
-                                                }}>
-                                                    {(outfit.items || []).map((item: any, idx: number) => {
-                                                        const factor = 105/315;
-                                                        return (
-                                                            <img
-                                                                key={`${item.id}-${idx}`}
-                                                                src={item.img}
-                                                                alt=""
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    left: `${item.x * factor}px`,
-                                                                    top: `${item.y * factor}px`,
-                                                                    width: `${110 * factor * (item.scale || 1)}px`,
-                                                                    height: `${110 * factor * (item.scale || 1)}px`,
-                                                                    objectFit: 'contain'
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </div>
+                                                    </button>
+                                                <OutfitRenderer items={outfit.items || []} containerWidth={105} />
                                                 <span style={galleryStyles.cardTitle}>{outfit.name}</span>
                                             </div>
                                         ))}
@@ -2930,6 +3101,7 @@ background-size: 12px !important;
                     )}
                 </div>
             )}
+
             {isCapsuleOutfitCreatorOpen && (
                 <div
                     style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#edecea', zIndex: 100001, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
@@ -2940,19 +3112,73 @@ background-size: 12px !important;
                         <button onClick={() => { setIsCapsuleOutfitCreatorOpen(false); setCapsuleCanvasItems([]); setCapsuleOutfitName(''); }} style={{ background: 'none', border: 'none', fontSize: '16px', color: '#6B6A69' }}>Отмена</button>
                         <input placeholder="Название образа" value={capsuleOutfitName} onChange={(e) => setCapsuleOutfitName(e.target.value)} style={{ background: 'none', border: 'none', borderBottom: '1px solid #151414', textAlign: 'center', fontSize: '16px', fontWeight: '600', outline: 'none', width: '50%' }} />
                         <button
-                            onClick={() => {
-                                if (capsuleCanvasItems.length === 0) { alert('Добавьте вещи на холст!'); return; }
-                                const newCapsuleOutfit = { id: Date.now(), name: capsuleOutfitName || "Образ капсулы", items: [...capsuleCanvasItems] };
+                            onClick={async () => {
+                                if (capsuleCanvasItems.length === 0) { 
+                                alert('Добавьте вещи на холст!'); 
+                                return; 
+                                }
+                                
+                                if (editingCapsuleId) {
+                                try {
+                                    const payload = {
+                                    name: capsuleOutfitName || "Образ капсулы",
+                                    capsule_id: editingCapsuleId,
+                                    items: capsuleCanvasItems.map(item => ({
+                                        clothing_item_id: item.id,
+                                        x: item.x,
+                                        y: item.y,
+                                        scale: item.scale
+                                    }))
+                                    };
+                                    
+                                    const response = await fetch(`${API_BASE_URL}/outfits/`, {
+                                    method: 'POST',
+                                    headers: { 
+                                        'Authorization': `Bearer ${token}`, 
+                                        'Content-Type': 'application/json' 
+                                    },
+                                    body: JSON.stringify(payload)
+                                    });
+                                    
+                                    if (!response.ok) throw new Error('Ошибка сохранения образа');
+                                    const savedOutfit = await response.json();
+                                    
+                                    const newOutfit = {
+                                    ...savedOutfit,
+                                    id: savedOutfit.id,
+                                    name: savedOutfit.name,
+                                    items: capsuleCanvasItems.map(item => ({
+                                        ...item,
+                                        outfit_item_id: item.id
+                                    }))
+                                    };
+                                    setCapsuleOutfits([newOutfit, ...capsuleOutfits]);
+                                    
+                                    haptic('medium');
+                                    setIsCapsuleOutfitCreatorOpen(false);
+                                    setCapsuleCanvasItems([]);
+                                    setCapsuleOutfitName('');
+                                } catch (e) {
+                                    console.error(e);
+                                    alert('Не удалось сохранить образ');
+                                }
+                                } else {
+                                const newCapsuleOutfit = { 
+                                    id: Date.now(), 
+                                    name: capsuleOutfitName || "Образ капсулы", 
+                                    items: [...capsuleCanvasItems] 
+                                };
                                 setCapsuleOutfits([newCapsuleOutfit, ...capsuleOutfits]);
                                 setIsCapsuleOutfitCreatorOpen(false);
                                 setCapsuleCanvasItems([]);
                                 setCapsuleOutfitName('');
                                 haptic('medium');
+                                }
                             }}
                             style={{ background: 'none', border: 'none', fontSize: '16px', fontWeight: '600', color: '#151414' }}
-                        >
+                            >
                             Готово
-                        </button>
+                            </button>
                     </div>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
                         <div style={{ width: '280px', height: '370px', backgroundColor: 'transparent', position: 'relative', overflow: 'hidden', border: '2px solid #151414', borderRadius: '24px', boxSizing: 'border-box' }}>
@@ -2996,6 +3222,7 @@ background-size: 12px !important;
                     </div>
                 </div>
             )}
+
             {isCapsuleOutfitItemPickerOpen && (
                 <div onClick={() => setIsCapsuleOutfitItemPickerOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002 }}>
                     <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60vh', backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
@@ -3032,6 +3259,7 @@ background-size: 12px !important;
                     </div>
                 </div>
             )}
+
             {isDrawerOpen && (
                 <div onClick={resetDrawerState} style={drawerStyles.backdrop} />
             )}
@@ -3211,6 +3439,7 @@ background-size: 12px !important;
                     </div>
                 </div>
             </div>
+
             {selectedItemForView && (
                 <>
                     <div
@@ -3226,25 +3455,8 @@ background-size: 12px !important;
                                 <img src={selectedItemForView.img} alt="" style={itemModalStyles.image} />
                             )}
                             {selectedItemForView.isDeletedOutfit && (
-                                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                    {(selectedItemForView.items || []).map((item: any, idx: number) => {
-                                        const factor = 0.45;
-                                        return (
-                                            <img
-                                                key={idx}
-                                                src={item.img}
-                                                style={{
-                                                    position: 'absolute',
-                                                    left: `${item.x * factor}px`,
-                                                    top: `${item.y * factor}px`,
-                                                    width: `${110 * factor * (item.scale || 1)}px`,
-                                                    height: `${110 * factor * (item.scale || 1)}px`,
-                                                    objectFit: 'contain'
-                                                }}
-                                                alt=""
-                                            />
-                                        );
-                                    })}
+                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <OutfitRenderer items={selectedItemForView.items || cartItemModal.items || []} containerWidth={140} />
                                 </div>
                             )}
                         </div>
@@ -3357,9 +3569,30 @@ background-size: 12px !important;
                                 </>
                             )}
                         </div>
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(21,20,20,0.05)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+                                <span style={{ fontSize: '13px', color: '#8B8A89' }}>Последний раз носили:</span>
+                                {selectedItemForView.last_worn_at ? (
+                                    <span style={{ 
+                                        fontSize: '13px', fontWeight: '600', color: '#2E7D32', 
+                                        backgroundColor: '#E8F5E9', padding: '4px 10px', borderRadius: '8px' 
+                                    }}>
+                                        {formatWornDate(selectedItemForView.last_worn_at)}
+                                    </span>
+                                ) : (
+                                    <span style={{ 
+                                        fontSize: '13px', fontWeight: '600', color: '#E65100', 
+                                        backgroundColor: '#FFF3E0', padding: '4px 10px', borderRadius: '8px' 
+                                    }}>
+                                        Никогда
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </>
             )}
+
             {selectedCapsuleForView && (
                 <>
                     <div
@@ -3385,26 +3618,7 @@ background-size: 12px !important;
                                             }}
                                             style={{ ...galleryStyles.card, cursor: 'pointer' }}
                                         >
-                                            <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
-                                                {(outfit.items || []).map((item: any, idx: number) => {
-                                                    const factor = 105/315;
-                                                    return (
-                                                        <img
-                                                            key={`${item.id}-${idx}`}
-                                                            src={item.img}
-                                                            alt=""
-                                                            style={{
-                                                                position: 'absolute',
-                                                                left: `${item.x * factor}px`,
-                                                                top: `${item.y * factor}px`,
-                                                                width: `${110 * factor * (item.scale || 1)}px`,
-                                                                height: `${110 * factor * (item.scale || 1)}px`,
-                                                                objectFit: 'contain'
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
+                                            <OutfitRenderer items={outfit.items || []} containerWidth={105} />
                                             <span style={galleryStyles.cardTitle}>{outfit.name}</span>
                                         </div>
                                     ))
@@ -3461,19 +3675,48 @@ background-size: 12px !important;
                                 <>
                                     <button
                                         style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                                        onClick={() => {
+                                        onClick={async () => {
+                                            try {
+                                            const outfitsRes = await fetch(`${API_BASE_URL}/outfits/?capsule_id=${selectedCapsuleForView.id}`, {
+                                                headers: { 'Authorization': `Bearer ${token}` }
+                                            });
+                                            
+                                            let loadedOutfits = [];
+                                            if (outfitsRes.ok) {
+                                                const rawOutfits = await outfitsRes.json();
+                                                loadedOutfits = rawOutfits.map((o: any) => ({
+                                                ...o,
+                                                items: (o.items || []).map((oi: any) => {
+                                                    const cId = oi.clothing_item_id || oi.clothing_id || oi.id;
+                                                    const cloth = clothes.find(c => c.id === cId);
+                                                    return {
+                                                    ...oi,
+                                                    id: cId,
+                                                    img: getFullImageUrl(cloth?.img || '/placeholder.png'),
+                                                    x: oi.x || 0,
+                                                    y: oi.y || 0,
+                                                    scale: oi.scale || 1
+                                                    };
+                                                })
+                                                }));
+                                            }
+                                            
                                             setEditingCapsuleId(selectedCapsuleForView.id);
                                             setCapsuleName(selectedCapsuleForView.name);
                                             setCapsuleItems(selectedCapsuleForView.items || []);
-                                            setCapsuleOutfits(selectedCapsuleForView.outfits || []);
+                                            setCapsuleOutfits(loadedOutfits); // 🔑 Используем загруженные аутфиты
                                             setCapsuleStep('items');
                                             setSelectedCapsuleForView(null);
                                             setIsCapsuleCreatorOpen(true);
                                             haptic('light');
+                                            } catch (e) {
+                                            console.error(e);
+                                            alert('Не удалось загрузить образы капсулы');
+                                            }
                                         }}
-                                    >
+                                        >
                                         Редактировать капсулу
-                                    </button>
+                                        </button>
                                     <button
                                         style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
                                         onClick={() => {
@@ -3489,6 +3732,7 @@ background-size: 12px !important;
                     </div>
                 </>
             )}
+
             {deleteConfirm && (
                 <>
                     <div onClick={() => setDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
@@ -3519,6 +3763,7 @@ background-size: 12px !important;
                     </div>
                 </>
             )}
+
             {showEmptyCapsuleAlert && (
                 <>
                     <div onClick={() => setShowEmptyCapsuleAlert(false)} style={{ ...galleryStyles.confirmBackdrop, zIndex: 100002 }} />
@@ -3532,55 +3777,57 @@ background-size: 12px !important;
                     </div>
                 </>
             )}
-            {selectedOutfitForView && (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100000 }}>
-        <div 
-            onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-        />
-        <div style={{ ...itemModalStyles.box, zIndex: 100001, paddingBottom: '20px' }}>
-            <div style={itemModalStyles.header}>
-                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
-                <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
-            </div>
-            
-            <div style={{ width: '240px', margin: '0 auto' }}>
-                <OutfitRenderer 
-                    items={selectedOutfitForView.items} 
-                    containerWidth={240} 
-                    showBorder={true} 
-                />
-            </div>
 
-            {!isViewOnlyOutfit && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                    <button
-                        style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                        onClick={() => {
-                            setEditingOutfitId(selectedOutfitForView.id);
-                            setCanvasItems(selectedOutfitForView.items);
-                            setOutfitName(selectedOutfitForView.name);
-                            setIsOutfitCreatorOpen(true);
-                            setSelectedOutfitForView(null);
-                            haptic('light');
-                        }}
-                    >
-                        Редактировать
-                    </button>
-                    <button
-                        style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                        onClick={() => {
-                            openDeleteModal(selectedOutfitForView.id, 'outfits');
-                            setSelectedOutfitForView(null);
-                        }}
-                    >
-                        Удалить образ
-                    </button>
+            {selectedOutfitForView && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100000 }}>
+                    <div 
+                        onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }}
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+                    />
+                    <div style={{ ...itemModalStyles.box, zIndex: 100001, paddingBottom: '20px' }}>
+                        <div style={itemModalStyles.header}>
+                            <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
+                            <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
+                        </div>
+                        
+                        <div style={{ width: '240px', margin: '0 auto' }}>
+                            <OutfitRenderer 
+                                items={selectedOutfitForView.items} 
+                                containerWidth={240} 
+                                showBorder={true} 
+                            />
+                        </div>
+
+                        {!isViewOnlyOutfit && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                                <button
+                                    style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                                    onClick={() => {
+                                        setEditingOutfitId(selectedOutfitForView.id);
+                                        setCanvasItems(selectedOutfitForView.items);
+                                        setOutfitName(selectedOutfitForView.name);
+                                        setIsOutfitCreatorOpen(true);
+                                        setSelectedOutfitForView(null);
+                                        haptic('light');
+                                    }}
+                                >
+                                    Редактировать
+                                </button>
+                                <button
+                                    style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                                    onClick={() => {
+                                        openDeleteModal(selectedOutfitForView.id, 'outfits');
+                                        setSelectedOutfitForView(null);
+                                    }}
+                                >
+                                    Удалить образ
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
-        </div>
-    </div>
-)}
+
             {deleteSuccessMessage && (
                 <>
                     <div style={galleryStyles.confirmBackdrop} />
@@ -3680,27 +3927,12 @@ background-size: 12px !important;
                                                 borderRadius: '10px',
                                                 overflow: 'hidden',
                                                 backgroundColor: '#E6E5E3',
-                                                position: 'relative',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
                                                 flexShrink: 0
                                             }}>
-                                                {(selectedOutfit.items || []).map((item: any, idx: number) => {
-                                                    const factor = 0.4;
-                                                    return (
-                                                        <img
-                                                            key={`${item.id}-${idx}`}
-                                                            src={item.img}
-                                                            alt=""
-                                                            style={{
-                                                                position: 'absolute',
-                                                                left: `${item.x * factor}px`,
-                                                                top: `${item.y * factor}px`,
-                                                                width: `${110 * factor * (item.scale || 1)}px`,
-                                                                height: `${110 * factor * (item.scale || 1)}px`,
-                                                                objectFit: 'contain'
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
+                                            <OutfitRenderer items={selectedOutfit.items || []} containerWidth={125} />
                                             </div>
                                             <span style={{
                                                 fontSize: '11px',
@@ -3791,25 +4023,8 @@ background-size: 12px !important;
                                                         gap: '6px'
                                                     }}
                                                 >
-                                                    <div style={{ width: '100%', height: '160px', backgroundColor: '#E6E5E3', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
-                                                        {(outfit.items || []).map((item: any, idx: number) => {
-                                                            const factor = 105 / 315; // Единая формула для всех миниатюр
-                                                            return (
-                                                                <img
-                                                                    key={`${item.id}-${idx}`}
-                                                                    src={item.img}
-                                                                    alt=""
-                                                                    style={{
-                                                                        position: 'absolute',
-                                                                        left: `${item.x * factor}px`,
-                                                                        top: `${item.y * factor}px`,
-                                                                        width: `${110 * factor * (item.scale || 1)}px`,
-                                                                        height: `${110 * factor * (item.scale || 1)}px`,
-                                                                        objectFit: 'contain'
-                                                                    }}
-                                                                />
-                                                            );
-                                                        })}
+                                                    <div style={{ width: '100%', height: '160px', backgroundColor: '#E6E5E3', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                                    <OutfitRenderer items={outfit.items || []} containerWidth={105} />
                                                     </div>
                                                     <span style={{ fontSize: '12px', fontWeight: '500', color: '#151414', display: 'block', textAlign: 'center' }}>
                                                         {outfit.name}
@@ -3866,6 +4081,7 @@ background-size: 12px !important;
                     </div>
                 </>
             )}
+
             {deleteOutfitConfirm && (
                 <>
                     <div
@@ -3992,9 +4208,9 @@ background-size: 12px !important;
                                                 city: newCity
                                             })
                                         });
-                                        console.log('✅ [Гео] Геолокация сохранена на бэк:', newCity);
+                                        console.log('[Гео] Геолокация сохранена на бэк:', newCity);
                                     } catch (e) {
-                                        console.warn('⚠️ [Гео] Не удалось сохранить геолокацию на бэк:', e);
+                                        console.warn('[Гео] Не удалось сохранить геолокацию на бэк:', e);
                                     }
                                     setIsCityPickerOpen(false);
                                     await fetchWeather({ lat: newLat, lon: newLon, city: newCity });
@@ -4097,9 +4313,9 @@ background-size: 12px !important;
                                                         city: city.name
                                                     })
                                                 });
-                                                console.log('✅ [Гео] Город сохранён на бэк:', city.name);
+                                                console.log('[Гео] Город сохранён на бэк:', city.name);
                                             } catch (e) {
-                                                console.warn('⚠️ [Гео] Не удалось сохранить город на бэк:', e);
+                                                console.warn('[Гео] Не удалось сохранить город на бэк:', e);
                                             }
                                             await fetchWeather({ lat: city.lat, lon: city.lon, city: city.name });
                                             haptic('medium');
@@ -4516,22 +4732,44 @@ const ProfileGallery = ({
                 )}
 
                 {activeTab === 'outfits' && (
-                    filteredOutfits.length > 0 ? (
-                        filteredOutfits.map((outfit: any) => (
-                            <div
-                                key={outfit.id}
-                                onClick={() => onOutfitClick(outfit)}
-                                style={{ ...galleryStyles.card, cursor: 'pointer' }}
-                            >
-                                <OutfitRenderer items={outfit.items} containerWidth={105} />
-                                <span style={galleryStyles.cardTitle}>{outfit.name}</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div style={galleryStyles.emptyState}>
-                            Создайте свой первый образ!
-                        </div>
-                    )
+                filteredOutfits.length > 0 ? (
+                filteredOutfits.map((outfit: any) => (
+                <div
+                key={outfit.id}
+                onClick={() => onOutfitClick(outfit)}
+                style={{ 
+                ...galleryStyles.card, 
+                cursor: 'pointer',
+                alignItems: 'center',
+                justifyContent: 'center'
+                }}
+                >
+                {outfit.capsule_name && (
+                <div style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                fontSize: '8px',
+                color: '#FFFFFF',
+                backgroundColor: 'rgba(21, 20, 20, 0.7)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                zIndex: 5,
+                fontWeight: '500',
+                backdropFilter: 'blur(4px)'
+                }}>
+                {outfit.capsule_name}
+                </div>
+                )}
+                <OutfitRenderer items={outfit.items} containerWidth={95} />
+                <span style={galleryStyles.cardTitle}>{outfit.name}</span>
+                </div>
+                ))
+                ) : (
+                <div style={galleryStyles.emptyState}>
+                Создайте свой первый образ!
+                </div>
+                )
                 )}
             </div>
         </div>
@@ -5008,238 +5246,238 @@ const widgetStyles: Record<string, React.CSSProperties> = {
 };
 
 const galleryStyles: Record<string, React.CSSProperties> = {
-  tabsContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    borderBottom: '1px solid rgba(21, 20, 20, 0.08)',
-    paddingBottom: '4px',
-    marginBottom: '20px',
-  },
-  tabButton: {
-    background: 'none',
-    border: 'none',
-    outline: 'none',
-    padding: '10px 12px',
-    fontSize: '15px',
-    cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
-    transition: 'all 0.2s ease',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '10px',
-    width: '100%',
-    boxSizing: 'border-box',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '16px',
-    padding: '6px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
-    boxSizing: 'border-box',
-    position: 'relative',
-    width: '100%',
-    height: '190px',
-    overflow: 'visible',
-  },
-  imageWrapper: {
-    width: '100%',
-    height: '160px',
-    borderRadius: '10px',
-    overflow: 'hidden',
-    backgroundColor: '#E6E5E3',
-    flexShrink: 0,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  cardTitle: {
-    fontSize: '11px',
-    fontWeight: '500',
-    color: '#151414',
-    paddingLeft: '2px',
-    textOverflow: 'ellipsis',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-  },
-  itemCount: {
-    fontSize: '11px',
-    color: '#8B8A89',
-    fontWeight: '500',
-    marginTop: '4px',
-    marginBottom: '12px',
-    paddingLeft: '2px',
-    fontFamily: 'Inter, sans-serif',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  outfitPreviewGrid: {
-    width: '100%',
-    height: '100px',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '3px',
-    backgroundColor: '#E6E5E3',
-    borderRadius: '10px',
-    padding: '3px',
-    boxSizing: 'border-box',
-    overflow: 'hidden',
-  },
-  gridImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    borderRadius: '6px',
-  },
-  emptyState: {
-    gridColumn: '1 / -1',
-    textAlign: 'center',
-    padding: '40px 20px',
-    color: '#6B6A69',
-    fontSize: '14px',
-  },
-  deleteBadge: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    width: '18px',
-    height: '18px',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(21, 20, 20, 0.75)',
-    color: '#FFFFFF',
-    border: 'none',
-    outline: 'none',
-    fontSize: '9px',
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    zIndex: 10,
-    transition: 'background-color 0.2s ease',
-  },
-  confirmBackdrop: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    zIndex: 99998,
-  },
-  confirmBox: {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '85%',
-    maxWidth: '320px',
-    backgroundColor: '#FFFFFF',
-    borderRadius: '24px',
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-    boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.12)',
-    zIndex: 99999,
-    boxSizing: 'border-box',
-    textAlign: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmText: {
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#151414',
-    lineHeight: '1.4',
-    fontFamily: 'Inter, sans-serif',
-  },
-  confirmActions: {
-    display: 'flex',
-    gap: '10px',
-    width: '100%',
-    flexShrink: 0,
-  },
-  confirmDeleteBtn: {
-    flex: 1,
-    padding: '14px',
-    backgroundColor: '#E57373',
-    color: '#FFFFFF',
-    border: 'none',
-    borderRadius: '14px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    lineHeight: '1',
-    whiteSpace: 'nowrap',
-  },
-  confirmCancelBtn: {
-    flex: 1,
-    padding: '14px',
-    backgroundColor: '#E6E5E3',
-    color: '#151414',
-    border: 'none',
-    borderRadius: '14px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    lineHeight: '1',
-    whiteSpace: 'nowrap',
-},
-  tabsAndSearch: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  filterRow: {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-  gap: '8px',
-  marginBottom: '16px',
-  alignItems: 'center',
-},
-filterSelect: {
-  width: '100%',
-  height: '31px',
-  boxSizing: 'border-box',
-  padding: '0 28px 0 8px',
-  borderRadius: '10px',
-  border: 'none',
-  backgroundColor: '#FFFFFF',
-  fontSize: '12px',
-  color: '#151414',
-  outline: 'none',
-  cursor: 'pointer',
-  fontFamily: 'Inter, sans-serif',
-  boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
-  textAlign: 'left',
-  appearance: 'none',
-    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B8A89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 8px center',
-    backgroundSize: '12px',
-    transition: 'background-image 0.2s ease, transform 0.2s ease',
+    tabsContainer: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid rgba(21, 20, 20, 0.08)',
+        paddingBottom: '4px',
+        marginBottom: '20px',
     },
-  searchCircle: {
-    flexShrink: 0,
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    backgroundColor: '#FFFFFF',
-    border: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    boxShadow: '0px 2px 8px rgba(0,0,0,0.05)',
-  },
+    tabButton: {
+        background: 'none',
+        border: 'none',
+        outline: 'none',
+        padding: '10px 12px',
+        fontSize: '15px',
+        cursor: 'pointer',
+        fontFamily: 'Inter, sans-serif',
+        transition: 'all 0.2s ease',
+    },
+    grid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '10px',
+        width: '100%',
+        boxSizing: 'border-box',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: '16px',
+        padding: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
+        boxSizing: 'border-box',
+        position: 'relative',
+        width: '100%',
+        minHeight: '190px',
+        overflow: 'visible',
+    },
+    imageWrapper: {
+        width: '100%',
+        height: '160px',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        backgroundColor: '#E6E5E3',
+        flexShrink: 0,
+    },
+    cardImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+    },
+    cardTitle: {
+        fontSize: '11px',
+        fontWeight: '500',
+        color: '#151414',
+        paddingLeft: '2px',
+        textOverflow: 'ellipsis',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+    },
+    itemCount: {
+        fontSize: '11px',
+        color: '#8B8A89',
+        fontWeight: '500',
+        marginTop: '4px',
+        marginBottom: '12px',
+        paddingLeft: '2px',
+        fontFamily: 'Inter, sans-serif',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+    },
+    outfitPreviewGrid: {
+        width: '100%',
+        height: '100px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '3px',
+        backgroundColor: '#E6E5E3',
+        borderRadius: '10px',
+        padding: '3px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+    },
+    gridImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        borderRadius: '6px',
+    },
+    emptyState: {
+        gridColumn: '1 / -1',
+        textAlign: 'center',
+        padding: '40px 20px',
+        color: '#6B6A69',
+        fontSize: '14px',
+    },
+    deleteBadge: {
+        position: 'absolute',
+        top: '10px',
+        right: '10px',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: 'rgba(21, 20, 20, 0.75)',
+        color: '#FFFFFF',
+        border: 'none',
+        outline: 'none',
+        fontSize: '9px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        zIndex: 10,
+        transition: 'background-color 0.2s ease',
+    },
+    confirmBackdrop: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        zIndex: 99998,
+    },
+    confirmBox: {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '85%',
+        maxWidth: '320px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '24px',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.12)',
+        zIndex: 99999,
+        boxSizing: 'border-box',
+        textAlign: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    confirmText: {
+        fontSize: '16px',
+        fontWeight: '500',
+        color: '#151414',
+        lineHeight: '1.4',
+        fontFamily: 'Inter, sans-serif',
+    },
+    confirmActions: {
+        display: 'flex',
+        gap: '10px',
+        width: '100%',
+        flexShrink: 0,
+    },
+    confirmDeleteBtn: {
+        flex: 1,
+        padding: '14px',
+        backgroundColor: '#E57373',
+        color: '#FFFFFF',
+        border: 'none',
+        borderRadius: '14px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        lineHeight: '1',
+        whiteSpace: 'nowrap',
+    },
+    confirmCancelBtn: {
+        flex: 1,
+        padding: '14px',
+        backgroundColor: '#E6E5E3',
+        color: '#151414',
+        border: 'none',
+        borderRadius: '14px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        lineHeight: '1',
+        whiteSpace: 'nowrap',
+    },
+    tabsAndSearch: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+    },
+    filterRow: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
+        gap: '8px',
+        marginBottom: '16px',
+        alignItems: 'center',
+    },
+    filterSelect: {
+        width: '100%',
+        height: '31px',
+        boxSizing: 'border-box',
+        padding: '0 28px 0 8px',
+        borderRadius: '10px',
+        border: 'none',
+        backgroundColor: '#FFFFFF',
+        fontSize: '12px',
+        color: '#151414',
+        outline: 'none',
+        cursor: 'pointer',
+        fontFamily: 'Inter, sans-serif',
+        boxShadow: '0px 2px 8px rgba(0,0,0,0.03)',
+        textAlign: 'left',
+        appearance: 'none',
+        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B8A89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 8px center',
+        backgroundSize: '12px',
+        transition: 'background-image 0.2s ease, transform 0.2s ease',
+        },
+    searchCircle: {
+        flexShrink: 0,
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
+        backgroundColor: '#FFFFFF',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0px 2px 8px rgba(0,0,0,0.05)',
+    },
 };
 
 const searchModalStyles: Record<string, React.CSSProperties> = {
@@ -5409,7 +5647,7 @@ const itemModalStyles: Record<string, React.CSSProperties> = {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)', // Сделал фон чуть темнее для контраста
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         zIndex: 99998,
     },
     box: {
@@ -5417,7 +5655,7 @@ const itemModalStyles: Record<string, React.CSSProperties> = {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '92%', // Чуть шире
+        width: '92%',
         maxWidth: '380px',
         backgroundColor: '#FFFFFF',
         borderRadius: '24px',
@@ -5428,7 +5666,7 @@ const itemModalStyles: Record<string, React.CSSProperties> = {
         boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.2)',
         zIndex: 99999,
         boxSizing: 'border-box',
-        maxHeight: '85vh', // Ограничиваем высоту всего окна
+        maxHeight: '85vh',
         overflowY: 'auto',
     },
     header: {
@@ -5454,19 +5692,19 @@ const itemModalStyles: Record<string, React.CSSProperties> = {
     },
     imageContainer: {
         width: '100%',
-        height: '300px', // <--- ФИКСИРОВАННАЯ ВЫСОТА (было minHeight)
+        height: '300px',
         borderRadius: '16px',
         overflow: 'hidden',
         backgroundColor: '#E6E5E3',
         display: 'flex',
-        alignItems: 'center', // Центрируем по вертикали
-        justifyContent: 'center', // Центрируем по горизонтали
+        alignItems: 'center',
+        justifyContent: 'center',
         position: 'relative',
     },
     image: {
         width: '100%',
         height: '100%',
-        objectFit: 'contain', // <--- ГЛАВНОЕ: показывает вещь целиком
+        objectFit: 'contain',
         display: 'block',
     },
     tagsContainer: {
