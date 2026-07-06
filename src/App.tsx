@@ -382,6 +382,64 @@ const POPULAR_CITIES = [
     { name: 'Владивосток', lat: 43.1198, lon: 131.8869 },
 ];
 
+interface OutfitRendererProps {
+    items: any[];
+    containerWidth: number;
+    showBorder?: boolean;
+    backgroundColor?: string;
+}
+
+const OutfitRenderer = ({
+    items = [],
+    containerWidth,
+    showBorder = false,
+    backgroundColor = '#F5F5F4',
+    }: OutfitRendererProps) => {
+    const DESIGN_WIDTH = 315;
+    const DESIGN_HEIGHT = 480;
+    const scale = containerWidth / DESIGN_WIDTH;
+    return (
+    <div
+        style={{
+            width: containerWidth,
+            height: DESIGN_HEIGHT * scale,
+            overflow: "hidden",
+            position: "relative",
+            border: showBorder ? "2px solid #151414" : "none",
+            backgroundColor: backgroundColor, // <-- Применяем фон
+            borderRadius: "16px",
+            boxSizing: "border-box",
+        }}
+        >
+    <div
+        style={{
+            width: DESIGN_WIDTH,
+            height: DESIGN_HEIGHT,
+            position: "relative",
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+        }}
+    >
+    {items.map((item: any, index: number) => (
+        <img
+            key={`${item.id}-${index}`}
+            src={item.img}
+            alt=""
+            style={{
+            position: "absolute",
+            left: item.x,
+            top: item.y,
+            width: 110 * (item.scale || 1),
+            height: 110 * (item.scale || 1),
+            objectFit: "contain",
+        }}
+        />
+    ))}
+    </div>
+    </div>
+    );
+};
+
 function App() {
     const { initData, isTelegram, haptic } = useTelegram();
     const [outfitCreatedMessage, setOutfitCreatedMessage] = useState<string | null>(null);
@@ -1288,40 +1346,29 @@ background-size: 12px !important;
                                 <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Образ сегодня</h2>
                                 <div style={outfitStyles.mainRow}>
                                     <div style={outfitStyles.outfitCard}>
-                                        {(() => {
-                                            const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
-                                            const todayRecord = wearRecords.find(r => r.worn_date === todayStr);
-                                            const todayOutfit = todayRecord ? outfits.find(o => o.id === todayRecord.outfit_id) : null;
-                                            if (todayOutfit) {
-                                                return (
-                                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <div style={outfitStyles.itemsGrid}>
-                                                            {todayOutfit.items.slice(0, 4).map((item: any, idx: number) => (
-                                                                <img
-                                                                    key={`${item.id}-${idx}`}
-                                                                    src={item.img}
-                                                                    alt=""
-                                                                    style={{
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        objectFit: 'contain',
-                                                                    }}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <div style={outfitStyles.emptyGrid}>
-                                                        <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
-                                                            Нет образа на сегодня
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
+                                    {(() => {
+                                    const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+                                    const todayRecord = wearRecords.find(r => r.worn_date === todayStr);
+                                    const todayOutfit = todayRecord ? outfits.find(o => o.id === todayRecord.outfit_id) : null;
+                                    if (todayOutfit) {
+                                    return (
+                                    <OutfitRenderer
+                                    items={todayOutfit.items}
+                                    containerWidth={140} // Оптимальная ширина для заполнения карточки
+                                    backgroundColor="#F9F8F6" // Легкий теплый фон, имитирующий фото
+                                    />
+                                    );
+                                    }
+                                    return (
+                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={outfitStyles.emptyGrid}>
+                                    <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
+                                    Нет образа на сегодня
+                                    </span>
+                                    </div>
+                                    </div>
+                                    );
+                                    })()}
                                     </div>
                                     <div style={widgetStyles.weatherCard}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1815,7 +1862,7 @@ background-size: 12px !important;
                                                     >
                                                         <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
                                                             {(outfit.items || []).map((item: any, idx: number) => {
-                                                                const factor = 0.333;
+                                                                const factor = 105/315;
                                                                 return (
                                                                     <img
                                                                         key={`${item.id}-${idx}`}
@@ -2839,7 +2886,7 @@ background-size: 12px !important;
                                                     margin: '0 auto'
                                                 }}>
                                                     {(outfit.items || []).map((item: any, idx: number) => {
-                                                        const factor = 0.333;
+                                                        const factor = 105/315;
                                                         return (
                                                             <img
                                                                 key={`${item.id}-${idx}`}
@@ -3332,7 +3379,7 @@ background-size: 12px !important;
                                         >
                                             <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
                                                 {(outfit.items || []).map((item: any, idx: number) => {
-                                                    const factor = 0.333;
+                                                    const factor = 105/315;
                                                     return (
                                                         <img
                                                             key={`${item.id}-${idx}`}
@@ -3478,74 +3525,55 @@ background-size: 12px !important;
                 </>
             )}
             {selectedOutfitForView && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100000 }}>
-                    <div
-                        onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }}
-                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-                    />
-                    <div style={{ ...itemModalStyles.box, zIndex: 100001 }}>
-                        <div style={itemModalStyles.header}>
-                            <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
-                            <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
-                        </div>
-                        <div style={{
-                            width: '240px',
-                            height: '365px',
-                            backgroundColor: '#E6E5E3',
-                            borderRadius: '16px',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            margin: '0 auto',
-                            border: '1px solid rgba(21, 20, 20, 0.05)'
-                        }}>
-                            {(selectedOutfitForView.items || []).map((item: any, idx: number) => {
-                                const factor = 0.76;
-                                return (
-                                    <img
-                                        key={`${item.id}-${idx}`}
-                                        src={item.img}
-                                        alt=""
-                                        style={{
-                                            position: 'absolute',
-                                            left: `${item.x * factor}px`,
-                                            top: `${item.y * factor}px`,
-                                            width: `${110 * factor * (item.scale || 1)}px`,
-                                            height: `${110 * factor * (item.scale || 1)}px`,
-                                            objectFit: 'contain'
-                                        }}
-                                    />
-                                );
-                            })}
-                        </div>
-                        {!isViewOnlyOutfit && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                                <button
-                                    style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                                    onClick={() => {
-                                        setEditingOutfitId(selectedOutfitForView.id);
-                                        setCanvasItems(selectedOutfitForView.items);
-                                        setOutfitName(selectedOutfitForView.name);
-                                        setIsOutfitCreatorOpen(true);
-                                        setSelectedOutfitForView(null);
-                                        haptic('light');
-                                    }}
-                                >
-                                    Редактировать
-                                </button>
-                                <button
-                                    style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                                    onClick={() => {
-                                        openDeleteModal(selectedOutfitForView.id, 'outfits');
-                                        setSelectedOutfitForView(null);
-                                    }}
-                                >
-                                    Удалить образ
-                                </button>
-                            </div>
-                        )}
-                    </div>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100000 }}>
+        <div 
+            onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+        />
+        <div style={{ ...itemModalStyles.box, zIndex: 100001, paddingBottom: '20px' }}>
+            <div style={itemModalStyles.header}>
+                <h3 style={itemModalStyles.title} className="fancy-serif">{selectedOutfitForView.name}</h3>
+                <button onClick={() => { setSelectedOutfitForView(null); setIsViewOnlyOutfit(false); }} style={itemModalStyles.closeBtn}>✕</button>
+            </div>
+            
+            {/* Вот здесь теперь отображается точная уменьшенная копия */}
+            <div style={{ width: '240px', margin: '0 auto' }}>
+                <OutfitRenderer 
+                    items={selectedOutfitForView.items} 
+                    containerWidth={240} 
+                    showBorder={true} 
+                />
+            </div>
+
+            {!isViewOnlyOutfit && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                    <button
+                        style={{ width: '100%', padding: '12px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                        onClick={() => {
+                            setEditingOutfitId(selectedOutfitForView.id);
+                            setCanvasItems(selectedOutfitForView.items);
+                            setOutfitName(selectedOutfitForView.name);
+                            setIsOutfitCreatorOpen(true);
+                            setSelectedOutfitForView(null);
+                            haptic('light');
+                        }}
+                    >
+                        Редактировать
+                    </button>
+                    <button
+                        style={{ width: '100%', padding: '12px', backgroundColor: '#E57373', color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                        onClick={() => {
+                            openDeleteModal(selectedOutfitForView.id, 'outfits');
+                            setSelectedOutfitForView(null);
+                        }}
+                    >
+                        Удалить образ
+                    </button>
                 </div>
             )}
+        </div>
+    </div>
+)}
             {deleteSuccessMessage && (
                 <>
                     <div style={galleryStyles.confirmBackdrop} />
@@ -3758,7 +3786,7 @@ background-size: 12px !important;
                                                 >
                                                     <div style={{ width: '100%', height: '160px', backgroundColor: '#E6E5E3', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
                                                         {(outfit.items || []).map((item: any, idx: number) => {
-                                                            const factor = 0.333;
+                                                            const factor = 105 / 315; // Единая формула для всех миниатюр
                                                             return (
                                                                 <img
                                                                     key={`${item.id}-${idx}`}
@@ -4488,31 +4516,14 @@ const ProfileGallery = ({
                                 onClick={() => onOutfitClick(outfit)}
                                 style={{ ...galleryStyles.card, cursor: 'pointer' }}
                             >
-                                <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
-                                    {(outfit.items || []).map((item: any, idx: number) => {
-                                        const factor = 0.333;
-                                        return (
-                                            <img
-                                                key={`${item.id}-${idx}`}
-                                                src={item.img}
-                                                alt=""
-                                                style={{
-                                                    position: 'absolute',
-                                                    left: `${item.x * factor}px`,
-                                                    top: `${item.y * factor}px`,
-                                                    width: `${110 * factor * (item.scale || 1)}px`,
-                                                    height: `${110 * factor * (item.scale || 1)}px`,
-                                                    objectFit: 'contain'
-                                                }}
-                                            />
-                                        );
-                                    })}
-                                </div>
+                                <OutfitRenderer items={outfit.items} containerWidth={105} />
                                 <span style={galleryStyles.cardTitle}>{outfit.name}</span>
                             </div>
                         ))
                     ) : (
-                        <div style={galleryStyles.emptyState}>Создайте свой первый образ!</div>
+                        <div style={galleryStyles.emptyState}>
+                            Создайте свой первый образ!
+                        </div>
                     )
                 )}
             </div>
@@ -4814,11 +4825,13 @@ const outfitStyles: Record<string, React.CSSProperties> = {
     outfitCard: {
         gridRow: '1 / span 2',
         backgroundColor: '#FFFFFF',
-        borderRadius: '20px', 
-        padding: '12px',      
+        borderRadius: '20px',
+        padding: '12px',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
         boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
     },
     outfitName: {
@@ -5383,97 +5396,99 @@ const cartPageStyles: Record<string, React.CSSProperties> = {
 };
 
 const itemModalStyles: Record<string, React.CSSProperties> = {
-  backdrop: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    zIndex: 99998,
-  },
-  box: {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '90%',
-    maxWidth: '360px',
-    backgroundColor: '#FFFFFF',
-    borderRadius: '24px',
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-    boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.15)',
-    zIndex: 99999,
-    boxSizing: 'border-box',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    margin: 0,
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#151414',
-    textTransform: 'uppercase',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '18px',
-    color: '#8B8A89',
-    cursor: 'pointer',
-  },
-  imageContainer: {
-    width: '100%',
-    minHeight: '200px', 
-    borderRadius: '16px',
-    overflow: 'hidden',
-    backgroundColor: '#E6E5E3',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  image: {
-    width: '100%',
-    height: 'auto',
-    maxHeight: '60vh',
-    objectFit: 'contain',
-    display: 'block',
-  },
-  tagsContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginTop: '4px',
-  },
-  tagRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 0',
-    borderBottom: '0.5px solid rgba(21, 20, 20, 0.05)',
-  },
-  tagLabel: {
-    fontSize: '13px',
-    color: '#8B8A89',
-    fontFamily: 'Inter, sans-serif',
-  },
-  tagBadge: {
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#151414',
-    backgroundColor: '#E6E5E3',
-    padding: '4px 10px',
-    borderRadius: '8px',
-    fontFamily: 'Inter, sans-serif',
-  },
+    backdrop: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)', // Сделал фон чуть темнее для контраста
+        zIndex: 99998,
+    },
+    box: {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '92%', // Чуть шире
+        maxWidth: '380px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '24px',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        boxShadow: '0px 16px 40px rgba(0, 0, 0, 0.2)',
+        zIndex: 99999,
+        boxSizing: 'border-box',
+        maxHeight: '85vh', // Ограничиваем высоту всего окна
+        overflowY: 'auto',
+    },
+    header: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    title: {
+        margin: 0,
+        fontSize: '18px',
+        fontWeight: '600',
+        color: '#151414',
+        textTransform: 'uppercase',
+    },
+    closeBtn: {
+        background: 'none',
+        border: 'none',
+        fontSize: '24px',
+        color: '#8B8A89',
+        cursor: 'pointer',
+        padding: '0',
+        lineHeight: '1',
+    },
+    imageContainer: {
+        width: '100%',
+        height: '300px', // <--- ФИКСИРОВАННАЯ ВЫСОТА (было minHeight)
+        borderRadius: '16px',
+        overflow: 'hidden',
+        backgroundColor: '#E6E5E3',
+        display: 'flex',
+        alignItems: 'center', // Центрируем по вертикали
+        justifyContent: 'center', // Центрируем по горизонтали
+        position: 'relative',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain', // <--- ГЛАВНОЕ: показывает вещь целиком
+        display: 'block',
+    },
+    tagsContainer: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        marginTop: '4px',
+    },
+    tagRow: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '4px 0',
+        borderBottom: '0.5px solid rgba(21, 20, 20, 0.05)',
+    },
+    tagLabel: {
+        fontSize: '13px',
+        color: '#8B8A89',
+        fontFamily: 'Inter, sans-serif',
+    },
+    tagBadge: {
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#151414',
+        backgroundColor: '#E6E5E3',
+        padding: '4px 10px',
+        borderRadius: '8px',
+        fontFamily: 'Inter, sans-serif',
+    },
 };
     
 export default App;
