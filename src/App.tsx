@@ -544,7 +544,8 @@ function App() {
                 mappedTrashClothes = data.map((i: any) => ({
                     ...i,
                     img: getFullImageUrl(i.image_url),
-                    deletedAt: i.deleted_at || i.deletedAt || new Date().toISOString()
+                    deletedAt: i.deleted_at || i.deletedAt || new Date().toISOString(),
+                    days_remaining: i.days_remaining ?? i.days_until_deleted
                 }));
                 setTrashClothes(mappedTrashClothes);
             }
@@ -562,6 +563,7 @@ function App() {
                     }
                     return {
                         ...o,
+                        days_remaining: o.days_remaining ?? o.days_until_deleted,
                         items: rawItems.map((item: any) => {
                             const cId = item.clothing_item_id || item.clothing_id || item.id;
                             const cloth = [...mappedTrashClothes, ...clothes].find((c: any) => String(c.id) === String(cId));
@@ -612,7 +614,12 @@ function App() {
                             })
                         };
                     }));
-                    return { ...c, items: mappedItems, outfits: mappedOutfits };
+                    return { 
+                        ...c, 
+                        days_remaining: c.days_remaining ?? c.days_until_deleted, // <-- Добавили эту строку
+                        items: mappedItems, 
+                        outfits: mappedOutfits 
+                    };
                 }));
                 setTrashCapsules(mappedTrashCapsules);
             }
@@ -1870,7 +1877,7 @@ function App() {
                                                         }}
                                                         style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
                                                     >
-                                                        <div style={galleryStyles.imageWrapper}>
+                                                        <div style={{ ...galleryStyles.imageWrapper, position: 'relative' }}>
                                                             <img src={item.img} alt={item.name} style={galleryStyles.cardImage} />
                                                             {item.days_remaining !== undefined && item.days_remaining !== null && (
                                                                 <div style={{
@@ -2150,11 +2157,11 @@ function App() {
                                             <div onClick={() => setPermanentDeleteConfirm(null)} style={galleryStyles.confirmBackdrop} />
                                             <div style={galleryStyles.confirmBox}>
                                                 <span style={galleryStyles.confirmText}>
-                                                    <strong style={{ color: '#E57373' }}>Безвозвратно удалить?</strong>
+                                                    <strong style={{ color: '#E57373' }}>Удалить навсегда?</strong>
                                                     <br />
-                                                    {permanentDeleteConfirm.type === 'clothes' && 'Эта вещь будет удалена навсегда.'}
-                                                    {permanentDeleteConfirm.type === 'outfits' && 'Этот образ будет удален навсегда.'}
-                                                    {permanentDeleteConfirm.type === 'capsules' && 'Эта капсула будет удалена навсегда.'}
+                                                    {permanentDeleteConfirm.type === 'clothes' && 'Эта вещь будет удалена.'}
+                                                    {permanentDeleteConfirm.type === 'outfits' && 'Этот образ будет удален.'}
+                                                    {permanentDeleteConfirm.type === 'capsules' && 'Эта капсула будет удалена.'}
                                                     <br />
                                                 </span>
                                                 <div style={galleryStyles.confirmActions}>
@@ -5570,75 +5577,75 @@ const searchModalStyles: Record<string, React.CSSProperties> = {
 };
 
 const cartPageStyles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '80px 24px',
-    textAlign: 'center',
-    boxSizing: 'border-box',
-  },
-  infoBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '14px',
-    padding: '12px 16px',
-    fontSize: '13px',
-    color: '#6B6A69',
-    textAlign: 'center',
-    marginBottom: '20px',
-    lineHeight: '1.4',
-    border: '1px solid rgba(21, 20, 20, 0.05)',
-    fontFamily: 'Inter, sans-serif',
-  },
-  daysLeftBadge: {
-    position: 'absolute',
-    bottom: '6px',
-    left: '6px',
-    backgroundColor: 'rgba(21, 20, 20, 0.8)',
-    color: '#FFFFFF',
-    padding: '3px 8px',
-    borderRadius: '8px',
-    fontSize: '10px',
-    fontWeight: '600',
-    zIndex: 5,
-    backdropFilter: 'blur(4px)',
-    letterSpacing: '0.5px',
-  },
-  emptyIcon: {},
-  emptyText: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#151414',
-    marginBottom: '8px',
-    fontFamily: 'Inter, sans-serif',
-  },
-  emptySubtext: {
-    fontSize: '14px',
-    color: '#6B6A69',
-    lineHeight: '1.5',
-    margin: '0',
-    maxWidth: '260px',
-    fontFamily: 'Inter, sans-serif',
-  },
-  restoreBtn: {
-    position: 'absolute',
-    top: '8px',
-    right: '8px',
-    width: '24px',
-    height: '24px',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(21, 20, 20, 0.8)',
-    color: '#FFFFFF',
-    border: 'none',
-    fontSize: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    zIndex: 10,
-  },
-};
+    container: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '80px 24px',
+        textAlign: 'center',
+        boxSizing: 'border-box',
+    },
+    infoBanner: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: '14px',
+        padding: '12px 16px',
+        fontSize: '13px',
+        color: '#6B6A69',
+        textAlign: 'center',
+        marginBottom: '20px',
+        lineHeight: '1.4',
+        border: '1px solid rgba(21, 20, 20, 0.05)',
+        fontFamily: 'Inter, sans-serif',
+    },
+    daysLeftBadge: {
+        position: 'absolute',
+        top: '6px',
+        right: '6px',
+        backgroundColor: 'rgba(21, 20, 20, 0.8)',
+        color: '#FFFFFF',
+        padding: '3px 8px',
+        borderRadius: '8px',
+        fontSize: '10px',
+        fontWeight: '600',
+        zIndex: 5,
+        backdropFilter: 'blur(4px)',
+        letterSpacing: '0.5px',
+        },
+    emptyIcon: {},
+    emptyText: {
+        fontSize: '18px',
+        fontWeight: '600',
+        color: '#151414',
+        marginBottom: '8px',
+        fontFamily: 'Inter, sans-serif',
+    },
+    emptySubtext: {
+        fontSize: '14px',
+        color: '#6B6A69',
+        lineHeight: '1.5',
+        margin: '0',
+        maxWidth: '260px',
+        fontFamily: 'Inter, sans-serif',
+    },
+    restoreBtn: {
+        position: 'absolute',
+        top: '8px',
+        right: '8px',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        backgroundColor: 'rgba(21, 20, 20, 0.8)',
+        color: '#FFFFFF',
+        border: 'none',
+        fontSize: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        zIndex: 10,
+    },
+    };
 
 const itemModalStyles: Record<string, React.CSSProperties> = {
     backdrop: {
