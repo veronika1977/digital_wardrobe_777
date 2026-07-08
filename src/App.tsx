@@ -2187,53 +2187,90 @@ function App() {
                             scrollbarWidth: 'none'
                         }}>
                             {trashCapsules.map((capsule: any) => {
-                            const itemsCount = capsule.items?.length || 0;
-                            const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
-                            return (
-                                <div
-                                key={capsule.id}
-                                onClick={() => {
-                                    setSelectedCapsuleForView({ ...capsule, isFromTrash: true });
-                                    haptic('light');
-                                }}
-                                style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
-                                >
-                                <div style={{
-                                    ...galleryStyles.imageWrapper,
-                                    display: 'grid',
-                                    gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                                    gap: '4px',
-                                    padding: '4px',
-                                    boxSizing: 'border-box',
-                                    alignContent: 'center',
-                                    position: 'relative'
-                                }}>
-                                    {capsule.items && capsule.items.map((item: any, idx: number) => (
-                                    <img
-                                        key={item.id || idx}
-                                        src={item.img}
-                                        style={{
-                                        width: '100%',
-                                        aspectRatio: '1/1',
-                                        objectFit: 'cover',
-                                        borderRadius: '4px',
-                                        backgroundColor: '#edecea'
+                                const hasOutfits = capsule.outfits && capsule.outfits.length > 0;
+                                const itemsCount = capsule.items?.length || 0;
+                                const columns = itemsCount > 9 ? 4 : itemsCount > 4 ? 3 : 2;
+                                
+                                return (
+                                    <div
+                                        key={capsule.id}
+                                        onClick={() => {
+                                            setSelectedCapsuleForView({ ...capsule, isFromTrash: true });
+                                            haptic('light');
                                         }}
-                                        alt=""
-                                    />
-                                    ))}
-                                    {capsule.days_remaining !== undefined && capsule.days_remaining !== null && (
-                                    <div style={{
-                                        ...cartPageStyles.daysLeftBadge,
-                                        color: capsule.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
-                                    }}>
-                                        {`${capsule.days_remaining} дн.`}
+                                        style={{ ...galleryStyles.card, position: 'relative', cursor: 'pointer' }}
+                                    >
+                                        <div style={{
+                                            ...galleryStyles.imageWrapper,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            padding: '4px',
+                                            boxSizing: 'border-box',
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}>
+                                            {hasOutfits ? (
+                                                <div style={{ 
+                                                    display: 'grid', 
+                                                    gridTemplateColumns: capsule.outfits.length > 1 ? 'repeat(2, 1fr)' : '1fr', 
+                                                    gap: '4px', 
+                                                    width: '100%', 
+                                                    height: '100%', 
+                                                    alignContent: 'center' 
+                                                }}>
+                                                    {capsule.outfits.slice(0, 4).map((outfit: any, idx: number) => (
+                                                        <div key={idx} style={{ 
+                                                            backgroundColor: '#F9F8F6', 
+                                                            borderRadius: '6px', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            justifyContent: 'center', 
+                                                            overflow: 'hidden',
+                                                            aspectRatio: '1/1'
+                                                        }}>
+                                                            <OutfitRenderer items={outfit.items || []} containerWidth={70} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ 
+                                                    display: 'grid', 
+                                                    gridTemplateColumns: `repeat(${columns}, 1fr)`, 
+                                                    gap: '4px', 
+                                                    width: '100%', 
+                                                    height: '100%', 
+                                                    alignContent: 'center' 
+                                                }}>
+                                                    {capsule.items && capsule.items.map((item: any, idx: number) => (
+                                                        <img
+                                                            key={item.id || idx}
+                                                            src={item.img}
+                                                            style={{
+                                                                width: '100%',
+                                                                aspectRatio: '1/1',
+                                                                objectFit: 'cover',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#edecea'
+                                                            }}
+                                                            alt=""
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {capsule.days_remaining !== undefined && capsule.days_remaining !== null && (
+                                                <div style={{
+                                                    ...cartPageStyles.daysLeftBadge,
+                                                    color: capsule.days_remaining <= 3 ? '#E57373' : '#FFFFFF'
+                                                }}>
+                                                    {`${capsule.days_remaining} дн.`}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span style={galleryStyles.cardTitle}>{capsule.name}</span>
                                     </div>
-                                    )}
-                                </div>
-                                <span style={galleryStyles.cardTitle}>{capsule.name}</span>
-                                </div>
-                            );
+                                );
                             })}
                         </div>
                         </div>
