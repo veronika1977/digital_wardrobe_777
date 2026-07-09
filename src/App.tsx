@@ -1637,7 +1637,16 @@ function App() {
                 <div style={{ ...outfitStyles.sectionContainer, flexShrink: 0 }}>
                     <h2 style={outfitStyles.sectionTitle} className="fancy-serif">Образ сегодня</h2>
                     <div style={outfitStyles.mainRow}>
-                    <div style={outfitStyles.outfitCard}>
+                    <div 
+                        style={{...outfitStyles.outfitCard, cursor: 'pointer', transition: 'transform 0.1s ease'}}
+                        onClick={() => {
+                            const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+                            
+                            setSelectedDateForOutfit(todayStr);
+                            setIsOutfitPickerOpen(true);
+                            haptic('light');
+                        }}
+                    >
                         {(() => {
                         const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
                         const todayRecord = wearRecords.find(r => r.worn_date === todayStr);
@@ -1652,12 +1661,48 @@ function App() {
                             );
                         }
                         return (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={outfitStyles.emptyGrid}>
-                                <span style={{ fontSize: '11px', color: '#8B8A89', textAlign: 'center', padding: '0 4px' }}>
-                                Нет образа на сегодня
+                            <div style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                gap: '2px',
+                                border: '1.5px dashed #D4D3D1',
+                                backgroundColor: '#F9F8F6',
+                                borderRadius: '12px',
+                                boxSizing: 'border-box',
+                                padding: '8px 0'
+                            }}>
+                                <span style={{ 
+                                    fontSize: '11px', 
+                                    color: '#8B8A89', 
+                                    textAlign: 'center', 
+                                    padding: '0 4px',
+                                    lineHeight: '1.2'
+                                }}>
+                                    Нет образа на сегодня
                                 </span>
-                            </div>
+                                <span style={{ 
+                                    fontSize: '11px', 
+                                    color: '#8B8A89', 
+                                    textAlign: 'center', 
+                                    padding: '0 4px',
+                                    fontWeight: '500'
+                                }}>
+                                    Выберите образ
+                                </span>
+                                <span style={{ 
+                                    fontSize: '28px', 
+                                    color: '#8B8A89', 
+                                    textAlign: 'center',
+                                    fontWeight: '300',
+                                    lineHeight: '1',
+                                    marginTop: '2px'
+                                }}>
+                                    +
+                                </span>
                             </div>
                         );
                         })()}
