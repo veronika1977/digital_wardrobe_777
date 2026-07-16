@@ -477,7 +477,6 @@ const OutfitRenderer = ({
 
 function App() {
     const { initData, isTelegram, haptic } = useTelegram();
-    const [isSavingWearToday, setIsSavingWearToday] = useState(false);
     const [outfitCreatedMessage, setOutfitCreatedMessage] = useState<string | null>(null);
     const hasHandledStartParam = useRef(false);
     const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
@@ -555,15 +554,81 @@ function App() {
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; type: 'clothes' | 'outfits' | 'capsules' } | null>(null);
     const [isWearTodayPickerOpen, setIsWearTodayPickerOpen] = useState(false);
     const [wearTodayItems, setWearTodayItems] = useState<number[]>([]);
+    const [isSavingWearToday, setIsSavingWearToday] = useState(false);
     const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'ai', content: string, outfits?: any[] }>>([]);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [selectedCapsuleForAi, setSelectedCapsuleForAi] = useState<number | null>(null);
-    const [savedAiOutfitIds, setSavedAiOutfitIds] = useState<Set<number>>(new Set());
-    const [isSavingAiOutfit, setIsSavingAiOutfit] = useState<number | null>(null);
+    const [savedAiOutfitIds, setSavedAiOutfitIds] = useState<Set<string>>(new Set());
+    const [isSavingAiOutfit, setIsSavingAiOutfit] = useState<string | null>(null);
+    const [aiInputMessage, setAiInputMessage] = useState<string>('');
+    const chatContainerRef = useRef<HTMLDivElement>(null);
 
     const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
         setDeleteConfirm({ id, type });
     };
+
+    const handleAiChatSubmit = async () => {
+    if (!aiInputMessage.trim() || isAiLoading) return;
+    
+    const userMsg = aiInputMessage.trim();
+    setAiInputMessage('');
+    setAiMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setIsAiLoading(true);
+    haptic('light');
+
+    try {
+        console.log('[AI Chat] Отправка сообщения:', userMsg);
+        
+        const response = await fetch(`${API_BASE_URL}/ai-stylist/chat`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: userMsg })
+        });
+
+        console.log('[AI Chat] Статус ответа:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Нет текста ошибки');
+            console.error('[AI Chat] Ошибка HTTP:', response.status, errorText);
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('[AI Chat] Полный ответ от сервера:', JSON.stringify(data, null, 2));
+        
+        // Проверяем все возможные поля
+        const aiText = data.reply || data.message || data.content || data.text || data.response || "Сообщение получено, но текст не распознан.";
+        
+        if (!aiText) {
+            console.warn('[AI Chat] Не найдено текстовое поле в ответе. Доступные поля:', Object.keys(data));
+        }
+        
+        const finalText = aiText || "Извините, не удалось получить ответ.";
+        
+        // Проверяем образы
+        const aiOutfits = data.outfits || data.suggestions || data.data?.outfits || data.data?.suggestions || [];
+
+        setAiMessages(prev => [...prev, {
+            role: 'ai',
+            content: finalText,
+            outfits: aiOutfits.length > 0 ? aiOutfits : undefined
+        }]);
+        
+        haptic('medium');
+    } catch (error) {
+        console.error('[AI Chat] Полная ошибка:', error);
+        setAiMessages(prev => [...prev, {
+            role: 'ai',
+            content: 'Извините, произошла ошибка при обработке вашего сообщения. Проверьте подключение к интернету.'
+        }]);
+        haptic('heavy');
+    } finally {
+        setIsAiLoading(false);
+    }
+};
 
     const fetchCart = async () => {
         if (!token) return;
@@ -1271,6 +1336,12 @@ function App() {
     };
 
     useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [aiMessages, isAiLoading]);
+
+    useEffect(() => {
         if (isAuthLoading || !hasSeenWelcome || clothes.length === 0 || hasHandledStartParam.current) return;
 
         const tg = (window as any).Telegram?.WebApp;
@@ -1283,9 +1354,7 @@ function App() {
                 setIsWearTodayPickerOpen(true);
                 haptic('medium');
             }, 300);
-            
             hasHandledStartParam.current = true;
-            
             if (window.history.replaceState) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -1521,44 +1590,52 @@ function App() {
             }));
             setCapsules(mappedCapsules);
 
-            const allCapsuleOutfitsRaw = mappedCapsules.flatMap((c: any) => c.outfits || []);
-            const uniqueCapsuleMap = new Map();
-            allCapsuleOutfitsRaw.forEach((o: any) => uniqueCapsuleMap.set(o.id, o));
-            const allCapsuleOutfits = Array.from(uniqueCapsuleMap.values());
-            const capsuleOutfitMap = new Map(allCapsuleOutfits.map((o: any) => [o.id, o]));
-
-            const uniqueFreshMap = new Map();
-            freshOutfits.forEach((o: any) => uniqueFreshMap.set(o.id, o));
-            const uniqueFreshOutfits = Array.from(uniqueFreshMap.values());
-
-            const updatedOutfits = uniqueFreshOutfits.map((o: any) => {
-                if (capsuleOutfitMap.has(o.id)) {
-                const capsuleOutfit = capsuleOutfitMap.get(o.id);
-                return {
-                    ...o,
-                    capsule_name: capsuleOutfit.capsule_name,
-                    capsule_id: capsuleOutfit.capsule_id
-                };
-                }
-                return o;
-            });
-
-            const existingOutfitIds = new Set(updatedOutfits.map((o: any) => o.id));
-            const newCapsuleOutfits = allCapsuleOutfits.filter((o: any) => !existingOutfitIds.has(o.id));
-
-            const finalOutfitsMap = new Map();
-            [...updatedOutfits, ...newCapsuleOutfits].forEach((o: any) => finalOutfitsMap.set(o.id, o));
-            setOutfits(Array.from(finalOutfitsMap.values()));
+            setCapsules(mappedCapsules);
+                const allCapsuleOutfitsRaw = mappedCapsules.flatMap((c: any) => c.outfits || []);
+                const uniqueCapsuleMap = new Map();
+                allCapsuleOutfitsRaw.forEach((o: any) => uniqueCapsuleMap.set(o.id, o));
+                const allCapsuleOutfits = Array.from(uniqueCapsuleMap.values());
+                const capsuleOutfitMap = new Map(allCapsuleOutfits.map((o: any) => [o.id, o]));
+                const uniqueFreshMap = new Map();
+                freshOutfits.forEach((o: any) => uniqueFreshMap.set(o.id, o));
+                const uniqueFreshOutfits = Array.from(uniqueFreshMap.values());
+                const updatedOutfits = uniqueFreshOutfits.map((o: any) => {
+                    if (capsuleOutfitMap.has(o.id)) {
+                        const capsuleOutfit = capsuleOutfitMap.get(o.id);
+                        return {
+                            ...o,
+                            capsule_name: capsuleOutfit.capsule_name,
+                            capsule_id: capsuleOutfit.capsule_id
+                        };
+                    }
+                    return o;
+                });
+                const existingOutfitIds = new Set(updatedOutfits.map((o: any) => o.id));
+                const newCapsuleOutfits = allCapsuleOutfits.filter((o: any) => !existingOutfitIds.has(o.id));
+                const finalOutfitsMap = new Map();
+                [...updatedOutfits, ...newCapsuleOutfits].forEach((o: any) => finalOutfitsMap.set(o.id, o));
+                setOutfits(Array.from(finalOutfitsMap.values()));
             }
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
             if (isNetworkError(error)) {
-            setNetworkError(true);
+                setNetworkError(true);
             }
         }
-        };
-        fetchAllData();
-        fetchWeather();
+
+        // === ЗАГРУЗКА ЗАПИСЕЙ О НОСКЕ (wear-records) ===
+        try {
+            const wearRes = await fetch(`${API_BASE_URL}/wear-records/`, { headers });
+            if (wearRes.ok) {
+                const wearData = await wearRes.json();
+                setWearRecords(wearData);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки записей носки:', error);
+        }
+    };
+    fetchAllData();
+    fetchWeather();
     }, [token]);
 
     useEffect(() => {
@@ -4882,51 +4959,58 @@ function App() {
         )}
 
         {currentScreen === 'ai' && (
-            <div style={{
-            width: '100%',
-            height: '100vh',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: '16px 16px 100px 16px',
-            boxSizing: 'border-box',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch',
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: '#edecea'
-            }}>
-            <div style={headerStyles.headerContainer}>
-                <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                    src="/Icon.png"
-                    alt="VS Logo"
-                    style={{ width: '60px', height: '60px', objectFit: 'contain' }}
-                />
-                </div>
-                <h1 style={headerStyles.headerTitle} className="fancy-serif">ИИ-СТИЛИСТ</h1>
+    <div style={{
+        width: '100%',
+        height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        padding: '16px 16px 100px 16px',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#edecea'
+    }}>
+        <div style={headerStyles.headerContainer}>
+            <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="/Icon.png" alt="VS Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingBottom: '20px' }}>
-                {aiMessages.length === 0 && (
+            <h1 style={headerStyles.headerTitle} className="fancy-serif">ИИ-СТИЛИСТ</h1>
+        </div>
+
+        <div 
+            ref={chatContainerRef}
+            style={{ 
+                flex: 1, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px', 
+                overflowY: 'auto', 
+                paddingBottom: '16px',
+                scrollbarWidth: 'none'
+            }}
+        >
+            {aiMessages.length === 0 && (
                 <div style={{
                     backgroundColor: '#FFFFFF',
                     borderRadius: '20px',
                     padding: '24px',
                     textAlign: 'center',
-                    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)'
+                    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)',
+                    marginTop: '20px'
                 }}>
                     <p style={{ fontSize: '16px', fontWeight: '600', color: '#151414', margin: '0 0 8px 0' }}>
-                    Привет! Я ваш ИИ-стилист 👋
+                        Привет! Я ваш ИИ-стилист 👋
                     </p>
                     <p style={{ fontSize: '14px', color: '#6B6A69', margin: 0, lineHeight: '1.5' }}>
-                    Я могу предложить готовые образы из вашего гардероба. Выберите капсулу или попросите меня создать образы из всей одежды.
+                        Вы можете спросить меня о сочетании цветов, попросить подобрать образ на мероприятие или просто написать "Сгенерируй образы".
                     </p>
                 </div>
-                )}
-                {aiMessages.map((msg, idx) => (
+            )}
+
+            {aiMessages.map((msg, idx) => (
                 <div key={idx} style={{
                     backgroundColor: msg.role === 'user' ? '#151414' : '#FFFFFF',
                     color: msg.role === 'user' ? '#FFFFFF' : '#151414',
@@ -4936,303 +5020,185 @@ function App() {
                     maxWidth: '85%',
                     boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)'
                 }}>
-                    <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>{msg.content}</p>
+                    <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                    
                     {msg.outfits && msg.outfits.length > 0 && (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '10px',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        marginTop: '12px'
-                    }}>
-                        {msg.outfits.map((outfit, outfitIdx) => {
-                        const isSaved = savedAiOutfitIds.has(outfitIdx);
-                        const isSaving = isSavingAiOutfit === outfitIdx;
-                        return (
-                            <div
-                            key={outfitIdx}
-                            onClick={() => { setSelectedOutfitForView(outfit); haptic('light'); }}
-                            style={{
-                                ...galleryStyles.card,
-                                cursor: 'pointer',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                            >
-                            <OutfitRenderer items={outfit.items || []} containerWidth={85} />
-                            <span style={{
-                                fontSize: '11px',
-                                fontWeight: '500',
-                                color: '#151414',
-                                paddingLeft: '2px',
-                                textOverflow: 'ellipsis',
-                                overflow: 'hidden',
-                                whiteSpace: 'nowrap'
-                            }}>{outfit.name}</span>
-                            <button
-                                onClick={async (e) => {
-                                e.stopPropagation();
-                                if (isSaved || isSaving) return;
-                                setIsSavingAiOutfit(outfitIdx);
-                                haptic('light');
-                                try {
-                                    const payload = {
-                                    name: outfit.name,
-                                    items: (outfit.items || []).map((item: any) => ({
-                                        clothing_item_id: item.id,
-                                        x: item.x || 0,
-                                        y: item.y || 0,
-                                        scale: item.scale || 1
-                                    }))
-                                    };
-                                    if (selectedCapsuleForAi) {
-                                    (payload as any).capsule_id = selectedCapsuleForAi;
-                                    }
-                                    const response = await fetch(`${API_BASE_URL}/outfits/`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Authorization': `Bearer ${token}`,
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify(payload)
-                                    });
-                                    if (!response.ok) throw new Error('Ошибка сохранения');
-                                    const savedOutfit = await response.json();
-                                    const newOutfit = {
-                                    ...savedOutfit,
-                                    id: savedOutfit.id,
-                                    name: outfit.name,
-                                    items: outfit.items.map((item: any) => ({
-                                        ...item,
-                                        x: item.x || 100,
-                                        y: item.y || 50,
-                                        scale: item.scale || 1,
-                                        outfit_item_id: item.id
-                                    })),
-                                    capsule_id: selectedCapsuleForAi,
-                                    capsule_name: selectedCapsuleForAi ? capsules.find(c => c.id === selectedCapsuleForAi)?.name : null,
-                                    deletedAt: null
-                                    };
-                                    setOutfits(prev => [newOutfit, ...prev]);
-                                    setSavedAiOutfitIds(prev => new Set([...prev, outfitIdx]));
-                                    haptic('medium');
-                                } catch (error) {
-                                    console.error('Ошибка сохранения образа:', error);
-                                    alert('Не удалось сохранить образ');
-                                } finally {
-                                    setIsSavingAiOutfit(null);
-                                }
-                                }}
-                                style={{
-                                position: 'absolute',
-                                top: '10px',
-                                right: '10px',
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '50%',
-                                border: 'none',
-                                backgroundColor: isSaved ? '#4CAF50' : isSaving ? '#8B8A89' : 'rgba(21, 20, 20, 0.75)',
-                                color: '#FFFFFF',
-                                fontSize: '9px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: isSaved || isSaving ? 'default' : 'pointer',
-                                opacity: isSaved || isSaving ? 0.7 : 1,
-                                transition: 'all 0.2s ease',
-                                zIndex: 10
-                                }}
-                                disabled={isSaved || isSaving}
-                            >
-                                {isSaved ? '✓' : isSaving ? '' : '+'}
-                            </button>
-                            </div>
-                        );
-                        })}
-                    </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gap: '10px',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            marginTop: '12px'
+                        }}>
+                            {msg.outfits.map((outfit, outfitIdx) => {
+                                const saveKey = `${idx}-${outfitIdx}`;
+                                const isSaved = savedAiOutfitIds.has(saveKey as any);
+                                const isSaving = isSavingAiOutfit === saveKey;
+                                
+                                return (
+                                    <div key={outfitIdx} style={{ ...galleryStyles.card, cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+                                         onClick={() => { setSelectedOutfitForView(outfit); haptic('light'); }}>
+                                        <OutfitRenderer items={outfit.items || []} containerWidth={85} />
+                                        <span style={{ fontSize: '11px', fontWeight: '500', color: '#151414', paddingLeft: '2px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                            {outfit.name || `Образ ${outfitIdx + 1}`}
+                                        </span>
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (isSaved || isSaving) return;
+                                                setIsSavingAiOutfit(saveKey);
+                                                haptic('light');
+                                                try {
+                                                    const payload = {
+                                                        name: outfit.name || `Образ от ИИ`,
+                                                        items: (outfit.items || []).map((item: any) => ({
+                                                            clothing_item_id: item.id,
+                                                            x: item.x || 0,
+                                                            y: item.y || 0,
+                                                            scale: item.scale || 1
+                                                        }))
+                                                    };
+                                                    if (selectedCapsuleForAi) {
+                                                        (payload as any).capsule_id = selectedCapsuleForAi;
+                                                    }
+                                                    const response = await fetch(`${API_BASE_URL}/outfits/`, {
+                                                        method: 'POST',
+                                                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(payload)
+                                                    });
+                                                    if (!response.ok) throw new Error('Ошибка сохранения');
+                                                    const savedOutfit = await response.json();
+                                                    
+                                                    const newOutfit = {
+                                                        ...savedOutfit,
+                                                        id: savedOutfit.id,
+                                                        name: outfit.name || `Образ от ИИ`,
+                                                        items: outfit.items.map((item: any) => ({
+                                                            ...item,
+                                                            x: item.x || 100,
+                                                            y: item.y || 50,
+                                                            scale: item.scale || 1,
+                                                            outfit_item_id: item.id
+                                                        })),
+                                                        capsule_id: selectedCapsuleForAi,
+                                                        capsule_name: selectedCapsuleForAi ? capsules.find(c => c.id === selectedCapsuleForAi)?.name : null,
+                                                        deletedAt: null
+                                                    };
+                                                    setOutfits(prev => [newOutfit, ...prev]);
+                                                    setSavedAiOutfitIds(prev => new Set([...prev, saveKey]));
+                                                    haptic('medium');
+                                                } catch (error) {
+                                                    console.error('Ошибка сохранения образа:', error);
+                                                    alert('Не удалось сохранить образ');
+                                                } finally {
+                                                    setIsSavingAiOutfit(null);
+                                                }
+                                            }}
+                                            style={{
+                                                position: 'absolute', top: '10px', right: '10px', width: '18px', height: '18px', borderRadius: '50%',
+                                                border: 'none', backgroundColor: isSaved ? '#4CAF50' : isSaving ? '#8B8A89' : 'rgba(21, 20, 20, 0.75)',
+                                                color: '#FFFFFF', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                cursor: isSaved || isSaving ? 'default' : 'pointer', opacity: isSaved || isSaving ? 0.7 : 1, zIndex: 10
+                                            }}
+                                            disabled={isSaved || isSaving}
+                                        >
+                                            {isSaved ? '✓' : isSaving ? '' : '+'}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
-                ))}
-                {isAiLoading && (
+            ))}
+            
+            {isAiLoading && (
                 <div style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '16px',
-                    padding: '16px',
-                    alignSelf: 'flex-start',
-                    maxWidth: '85%',
-                    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
+                    backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '16px', alignSelf: 'flex-start',
+                    maxWidth: '85%', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)', display: 'flex', alignItems: 'center', gap: '12px'
                 }}>
                     <div style={drawerStyles.spinner} />
-                    <span style={{ fontSize: '14px', color: '#6B6A69' }}>Генерирую образы...</span>
+                    <span style={{ fontSize: '14px', color: '#6B6A69' }}>Стилист печатает...</span>
                 </div>
-                )}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
-                {capsules.length > 0 && (
-                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                    <button
+            )}
+        </div>
+
+        {capsules.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none', flexShrink: 0 }}>
+                <button
                     onClick={() => setSelectedCapsuleForAi(null)}
                     style={{
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        border: 'none',
+                        padding: '8px 16px', borderRadius: '20px', border: 'none',
                         backgroundColor: selectedCapsuleForAi === null ? '#151414' : '#FFFFFF',
                         color: selectedCapsuleForAi === null ? '#FFFFFF' : '#151414',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
+                        fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0
                     }}
-                    >
-                    Все вещи
-                    </button>
-                    {capsules.filter(c => !c.deletedAt).map(capsule => (
+                >
+                    Весь гардероб
+                </button>
+                {capsules.filter(c => !c.deletedAt).map(capsule => (
                     <button
                         key={capsule.id}
                         onClick={() => setSelectedCapsuleForAi(capsule.id)}
                         style={{
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        border: 'none',
-                        backgroundColor: selectedCapsuleForAi === capsule.id ? '#151414' : '#FFFFFF',
-                        color: selectedCapsuleForAi === capsule.id ? '#FFFFFF' : '#151414',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
+                            padding: '8px 16px', borderRadius: '20px', border: 'none',
+                            backgroundColor: selectedCapsuleForAi === capsule.id ? '#151414' : '#FFFFFF',
+                            color: selectedCapsuleForAi === capsule.id ? '#FFFFFF' : '#151414',
+                            fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0
                         }}
                     >
                         {capsule.name}
                     </button>
-                    ))}
-                </div>
-                )}
-                <button
-                onClick={async () => {
-                    if (isAiLoading) return;
-                    let itemsToCheck = clothes.filter(item => !item.deletedAt);
-                    if (selectedCapsuleForAi) {
-                    const capsule = capsules.find(c => c.id === selectedCapsuleForAi);
-                    if (capsule) {
-                        const capsuleItemIds = capsule.items.map((i: any) => i.id);
-                        itemsToCheck = itemsToCheck.filter(item => capsuleItemIds.includes(item.id));
-                    }
-                    }
-                    if (itemsToCheck.length < 3) {
-                    setAiMessages(prev => [...prev, {
-                        role: 'ai',
-                        content: `Для генерации образов нужно минимум 3 вещи. Сейчас у вас ${itemsToCheck.length} ${itemsToCheck.length === 1 ? 'вещь' : itemsToCheck.length < 5 ? 'вещи' : 'вещей'}. Добавьте ещё одежды в гардероб${selectedCapsuleForAi ? ' или выберите другую капсулу' : ''}.`
-                    }]);
-                    haptic('heavy');
-                    return;
-                    }
-                    setIsAiLoading(true);
-                    const userMessage = selectedCapsuleForAi
-                    ? `Предложи образы из капсулы "${capsules.find(c => c.id === selectedCapsuleForAi)?.name}"`
-                    : 'Предложи образы из всего моего гардероба';
-                    setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-                    try {
-                    const payload = selectedCapsuleForAi ? { capsule_id: selectedCapsuleForAi } : {};
-                    console.log('[AI] Отправка запроса:', payload);
-                    const response = await fetch(`${API_BASE_URL}/outfits/generate`, {
-                        method: 'POST',
-                        headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    console.log('[AI] Статус ответа:', response.status);
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        const errorMsg = errorData.detail || errorData.message || `Ошибка ${response.status}`;
-                        console.error('[AI] Ошибка сервера:', errorMsg);
-                        throw new Error(errorMsg);
-                    }
-                    const data = await response.json();
-                    console.log('[AI] Получен ответ:', data);
-                    const rawOutfits = data.suggestions || data.outfits || data.data?.suggestions || data.data?.outfits || [];
-                    if (!Array.isArray(rawOutfits)) {
-                        console.error('[AI] outfits не является массивом:', rawOutfits);
-                        throw new Error('Неверный формат ответа от сервера');
-                    }
-                    const outfits = rawOutfits.map((outfit: any) => {
-                        const items = (outfit.items || []).map((item: any, itemIdx: number) => {
-                        const cloth = clothes.find(c => c.id === item.clothing_item_id);
-                        const spacing = 120;
-                        const startY = 80;
-                        const centerX = 102;
-                        return {
-                            id: item.clothing_item_id,
-                            img: getFullImageUrl(item.image_url || cloth?.img || '/placeholder.png'),
-                            x: centerX,
-                            y: startY + (itemIdx * spacing),
-                            scale: 1
-                        };
-                        });
-                        return {
-                        ...outfit,
-                        items
-                        };
-                    });
-                    if (outfits.length === 0) {
-                        setAiMessages(prev => [...prev, {
-                        role: 'ai',
-                        content: 'К сожалению, не удалось сгенерировать образы. Убедитесь, что в гардеробе есть достаточно вещей.'
-                        }]);
-                    } else {
-                        setAiMessages(prev => [...prev, {
-                        role: 'ai',
-                        content: `Вот ${outfits.length} ${outfits.length === 1 ? 'образ' : outfits.length < 5 ? 'образа' : 'образов'} для вас:`,
-                        outfits: outfits
-                        }]);
-                    }
-                    haptic('medium');
-                    } catch (error) {
-                    console.error('[AI] Полная ошибка:', error);
-                    const errorMsg = error instanceof Error ? error.message : 'Неизвестная ошибка';
-                    let friendlyMessage = 'Извините, произошла ошибка при генерации образов.';
-                    if (errorMsg.includes('3 clothing items')) {
-                        friendlyMessage = `Для генерации нужно минимум 3 вещи. У вас сейчас ${itemsToCheck.length}. Добавьте ещё одежды!`;
-                    } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-                        friendlyMessage = 'Сессия истекла. Пожалуйста, войдите заново.';
-                    } else if (errorMsg.includes('Network') || errorMsg.includes('fetch')) {
-                        friendlyMessage = 'Проблема с соединением. Проверьте интернет.';
-                    } else {
-                        friendlyMessage = `Ошибка: ${errorMsg}`;
-                    }
-                    setAiMessages(prev => [...prev, {
-                        role: 'ai',
-                        content: friendlyMessage
-                    }]);
-                    haptic('heavy');
-                    } finally {
-                    setIsAiLoading(false);
-                    }
-                }}
-                style={{
-                    width: '100%',
-                    padding: '16px',
-                    backgroundColor: '#151414',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '16px',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    cursor: isAiLoading ? 'wait' : 'pointer',
-                    opacity: isAiLoading ? 0.6 : 1,
-                    boxShadow: '0px 6px 16px rgba(21, 20, 20, 0.15)'
-                }}
-                >
-                {isAiLoading ? 'Генерирую...' : 'Сгенерировать образы'}
-                </button>
-            </div>
+                ))}
             </div>
         )}
+
+        Поле ввода чата
+        <div style={{
+            display: 'flex', gap: '8px', padding: '12px 0', borderTop: '1px solid rgba(21, 20, 20, 0.08)',
+            backgroundColor: '#edecea', flexShrink: 0
+        }}>
+            <input
+                type="text"
+                value={aiInputMessage}
+                onChange={(e) => setAiInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAiChatSubmit();
+                    }
+                }}
+                placeholder="Спросите стилиста или попросите создать образ..."
+                disabled={isAiLoading}
+                style={{
+                    flex: 1, padding: '12px 16px', borderRadius: '24px', border: '1px solid #D4D3D1',
+                    backgroundColor: '#FFFFFF', fontSize: '14px', outline: 'none', fontFamily: 'Inter, sans-serif'
+                }}
+            />
+            <button
+                onClick={handleAiChatSubmit}
+                disabled={isAiLoading || !aiInputMessage.trim()}
+                style={{
+                    width: '44px', height: '44px', borderRadius: '50%',
+                    backgroundColor: aiInputMessage.trim() && !isAiLoading ? '#151414' : '#D4D3D1',
+                    color: '#FFFFFF', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: aiInputMessage.trim() && !isAiLoading ? 'pointer' : 'not-allowed',
+                    transition: 'background-color 0.2s ease'
+                }}
+            >
+                {isAiLoading ? (
+                    <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                )}
+            </button>
+        </div>
+    </div>
+)}
 
         <BottomNavBar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
         </div>
