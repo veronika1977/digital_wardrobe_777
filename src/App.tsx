@@ -853,7 +853,6 @@ function App() {
             ));
 
             try {
-            // === ОБРАЗЫ ===
             const affectedOutfits = outfits.filter(o =>
                 !o.deletedAt && (o.items || []).some((i: any) => i.id === id)
             );
@@ -876,7 +875,6 @@ function App() {
                 }
             }
 
-            // === КАПСУЛЫ ===
             const affectedCapsules = capsules.filter(c =>
                 !c.deletedAt && (c.items || []).some((i: any) => i.id === id)
             );
@@ -968,7 +966,6 @@ function App() {
             if (updatedItems.length < selectedOutfitForView.items.length) {
                 setSelectedOutfitForView({ ...selectedOutfitForView, items: updatedItems });
             }
-            // === ИСПРАВЛЕНИЕ: Синхронизируем окно капсулы при удалении вещи ===
             if (selectedCapsuleForView) {
                 setSelectedCapsuleForView((prev: any) => {
                     if (!prev) return prev;
@@ -1019,7 +1016,6 @@ function App() {
                 outfit.capsule_id === id ? { ...outfit, deletedAt: now } : outfit
             ));
             
-            // === ИСПРАВЛЕНИЕ: Закрываем окно просмотра, если удалили текущую капсулу ===
             if (selectedCapsuleForView?.id === id) {
                 setSelectedCapsuleForView(null);
             }
@@ -1350,10 +1346,13 @@ function App() {
         const action = urlParams.get('action') || urlParams.get('start') || urlParams.get('startapp');
 
         if (startParam === 'wear_today' || action === 'wear_today') {
-            setTimeout(() => {
-                setIsWearTodayPickerOpen(true);
-                haptic('medium');
-            }, 300);
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+            setSelectedDateForOutfit(tomorrowStr);
+            setIsOutfitPickerOpen(true);
+            haptic('medium');
+            
             hasHandledStartParam.current = true;
             if (window.history.replaceState) {
                 window.history.replaceState({}, document.title, window.location.pathname);
@@ -3071,129 +3070,116 @@ function App() {
         )}
 
         {isWearTodayPickerOpen && (
-            <div
-                onClick={() => !isSavingWearToday && setIsWearTodayPickerOpen(false)}
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
-            >
-                <div
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                        position: 'absolute', bottom: 0, left: 0, right: 0, height: '80vh',
-                        backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px',
-                        display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
-                    }}
-                >
-                    {/* Шапка */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '600', fontSize: '20px', color: '#151414' }}>Что вы носили сегодня?</span>
-                        <button
-                            onClick={() => !isSavingWearToday && setIsWearTodayPickerOpen(false)}
-                            style={{ background: 'none', border: 'none', fontSize: '24px', fontWeight: '600', color: '#8B8A89', cursor: 'pointer', lineHeight: 1 }}
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    
-                    {/* Подсказка */}
-                    <p style={{ fontSize: '13px', color: '#6B6A69', margin: '0 0 16px 0', lineHeight: '1.4' }}>
-                        Отметьте вещи, которые были на вас сегодня. Это поможет вести точную статистику носки.
-                    </p>
-
-                    {/* Сетка вещей */}
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
-                        {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
-                            const isSelected = wearTodayItems.includes(item.id);
-                            return (
-                                <div
-                                    key={item.id}
-                                    onClick={() => {
-                                        if (isSavingWearToday) return;
-                                        if (isSelected) setWearTodayItems(wearTodayItems.filter(id => id !== item.id));
-                                        else setWearTodayItems([...wearTodayItems, item.id]);
-                                        haptic('light');
-                                    }}
-                                    style={{
-                                        aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative',
-                                        border: isSelected ? '3px solid #4CAF50' : '1px solid #E6E5E3',
-                                        opacity: isSelected ? 0.9 : 1, 
-                                        cursor: isSavingWearToday ? 'default' : 'pointer',
-                                        transition: 'all 0.15s ease',
-                                        transform: isSelected ? 'scale(0.95)' : 'scale(1)'
-                                    }}
-                                >
-                                    <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                                    {isSelected && (
-                                        <div style={{
-                                            position: 'absolute', top: '6px', right: '6px', backgroundColor: '#4CAF50',
-                                            color: '#fff', borderRadius: '50%', width: '24px', height: '24px',
-                                            fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                                        }}>✓</div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Кнопка сохранения */}
-                    <button
-                        disabled={isSavingWearToday || wearTodayItems.length === 0}
-                        onClick={async () => {
-                            if (wearTodayItems.length === 0) {
-                                haptic('heavy');
-                                return;
-                            }
-                            setIsSavingWearToday(true);
-                            const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
-                            
-                            try {
-                                await Promise.all(wearTodayItems.map(itemId =>
-                                    fetch(`${API_BASE_URL}/clothes/${itemId}`, {
-                                        method: 'PATCH',
-                                        headers: {
-                                            'Authorization': `Bearer ${token}`,
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({ last_worn_at: todayStr })
-                                    })
-                                ));
-                                
-                                // Обновляем локальный стейт
-                                setClothes(prev => prev.map(item =>
-                                    wearTodayItems.includes(item.id)
-                                        ? { ...item, last_worn_at: todayStr }
-                                        : item
-                                ));
-                                
-                                haptic('medium');
-                                setIsWearTodayPickerOpen(false);
-                                setWearTodayItems([]);
-                                
-                                // Показываем красивое уведомление
-                                setOutfitCreatedMessage('Спасибо! Дата носки обновлена 🎉');
-                                setTimeout(() => setOutfitCreatedMessage(null), 3000);
-                            } catch (e) {
-                                console.error(e);
-                                alert('Не удалось сохранить запись');
-                            } finally {
-                                setIsSavingWearToday(false);
-                            }
-                        }}
-                        style={{
-                            width: '100%', padding: '16px', 
-                            backgroundColor: wearTodayItems.length === 0 ? '#E6E5E3' : '#4CAF50', 
-                            color: wearTodayItems.length === 0 ? '#8B8A89' : '#FFFFFF',
-                            border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600',
-                            cursor: isSavingWearToday || wearTodayItems.length === 0 ? 'not-allowed' : 'pointer', 
-                            marginTop: '10px', boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
-                            opacity: isSavingWearToday ? 0.7 : 1,
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {isSavingWearToday ? 'Сохраняем...' : `Сохранить (${wearTodayItems.length})`}
-                    </button>
-                </div>
-            </div>
+        <div
+            onClick={() => !isSavingWearToday && setIsWearTodayPickerOpen(false)}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100000 }}
+        >
+        <div
+            onClick={e => e.stopPropagation()}
+            style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '80vh',
+            backgroundColor: '#ffffff', borderRadius: '28px 28px 0 0', padding: '20px',
+            display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
+            }}
+        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ fontWeight: '600', fontSize: '20px', color: '#151414' }}>Что вы носили сегодня?</span>
+        <button
+        onClick={() => !isSavingWearToday && setIsWearTodayPickerOpen(false)}
+        style={{ background: 'none', border: 'none', fontSize: '24px', fontWeight: '600', color: '#8B8A89', cursor: 'pointer', lineHeight: 1 }}
+        >
+        ✕
+        </button>
+        </div>
+        <p style={{ fontSize: '13px', color: '#6B6A69', margin: '0 0 16px 0', lineHeight: '1.4' }}>
+        Отметьте вещи, которые были на вас сегодня. Это поможет вести точную статистику носки.
+        </p>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
+        {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
+        const isSelected = wearTodayItems.includes(item.id);
+        return (
+        <div
+        key={item.id}
+        onClick={() => {
+        if (isSavingWearToday) return;
+        if (isSelected) setWearTodayItems(wearTodayItems.filter(id => id !== item.id));
+        else setWearTodayItems([...wearTodayItems, item.id]);
+        haptic('light');
+        }}
+        style={{
+        aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', position: 'relative',
+        border: isSelected ? '3px solid #4CAF50' : '1px solid #E6E5E3',
+        opacity: isSelected ? 0.9 : 1,
+        cursor: isSavingWearToday ? 'default' : 'pointer',
+        transition: 'all 0.15s ease',
+        transform: isSelected ? 'scale(0.95)' : 'scale(1)'
+        }}
+        >
+        <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+        {isSelected && (
+        <div style={{
+        position: 'absolute', top: '6px', right: '6px', backgroundColor: '#4CAF50',
+        color: '#fff', borderRadius: '50%', width: '24px', height: '24px',
+        fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+        }}>✓</div>
+        )}
+        </div>
+        );
+        })}
+        </div>
+        <button
+        disabled={isSavingWearToday || wearTodayItems.length === 0}
+        onClick={async () => {
+        if (wearTodayItems.length === 0) {
+        haptic('heavy');
+        return;
+        }
+        setIsSavingWearToday(true);
+        const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+        try {
+        await Promise.all(wearTodayItems.map(itemId =>
+        fetch(`${API_BASE_URL}/clothes/${itemId}`, {
+        method: 'PATCH',
+        headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ last_worn_at: todayStr })
+        })
+        ));
+        setClothes(prev => prev.map(item =>
+        wearTodayItems.includes(item.id)
+        ? { ...item, last_worn_at: todayStr }
+        : item
+        ));
+        haptic('medium');
+        setIsWearTodayPickerOpen(false);
+        setWearTodayItems([]);
+        setOutfitCreatedMessage('Спасибо! Дата носки обновлена 🎉');
+        setTimeout(() => setOutfitCreatedMessage(null), 3000);
+        } catch (e) {
+        console.error(e);
+        alert('Не удалось сохранить запись');
+        } finally {
+        setIsSavingWearToday(false);
+        }
+        }}
+        style={{
+        width: '100%', padding: '16px',
+        backgroundColor: wearTodayItems.length === 0 ? '#E6E5E3' : '#4CAF50',
+        color: wearTodayItems.length === 0 ? '#8B8A89' : '#FFFFFF',
+        border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600',
+        cursor: isSavingWearToday || wearTodayItems.length === 0 ? 'not-allowed' : 'pointer',
+        marginTop: '10px', boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+        opacity: isSavingWearToday ? 0.7 : 1,
+        transition: 'all 0.2s ease'
+        }}
+        >
+        {isSavingWearToday ? 'Сохраняем...' : `Сохранить (${wearTodayItems.length})`}
+        </button>
+        </div>
+        </div>
         )}
 
         {isCapsuleCreatorOpen && (
