@@ -205,8 +205,8 @@ const PhotoPicker = ({ onImageSelected }: any) => {
 
 const BottomNavBar = ({ currentScreen, onScreenChange }: { currentScreen: string; onScreenChange: (screen: any) => void }) => {
     const tabs = [
-        { id: 'ai', label: 'ИИ' },
         { id: 'home', label: 'ГС' },
+        { id: 'ai', label: 'ИИ' },
         { id: 'profile', label: 'ЛК' },
     ];
   
