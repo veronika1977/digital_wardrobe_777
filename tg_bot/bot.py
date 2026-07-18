@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import backend_client
+import html
 
 from dotenv import load_dotenv
 import os
@@ -27,6 +28,10 @@ logging.basicConfig(level=logging.INFO)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
+def escape_html(text: str) -> str:
+    if not text:
+        return ""
+    return str(text).replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;")
 
 # --- Хэндлер: /start ---
 @dp.message(CommandStart())
@@ -46,7 +51,12 @@ async def command_start_handler(message: types.Message):
         "• хранить свои вещи\n"
         "• создавать стильные образы\n"
         "• быстро подбирать луки\n\n"
-        "Нажми кнопку ниже, чтобы открыть приложение."
+        "Беспоатная версия предоставляет доступ:\n"
+        "• 1 капсула\n" 
+        "• 3 образа\n"
+        "• 10 вещей\n"
+        "Чтобы разблокировать безлимитный доступ и ИИ-стилиста - оплатите подписку в приложении\n\n"
+        "Нажми кнопку ниже, чтобы открыть приложение.\n"
     )
 
     builder = InlineKeyboardBuilder()
@@ -194,34 +204,6 @@ async def callback_back_to_settings(callback: CallbackQuery):
     await callback.message.edit_text(settings_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     await callback.answer()
 
-async def send_daily_notification(bot: Bot, current_hour: int = 19):
-
-    users = await backend_client.get_users_to_notify(hour=current_hour)
-    
-    notification_text = (
-        "🔔 Вы не отметили одежду, которую носили сегодня. Это можно сделать тут 👇"
-    )
-    
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(
-            text="📝 Отметить, что носили сегодня",
-            web_app=WebAppInfo(url=f"{MINI_APP_URL}?action=wear_today")
-        )
-    )
-    keyboard = builder.as_markup()
-
-    sent_count = 0
-    for user in users:
-        try:
-            await bot.send_message(user["telegram_id"], notification_text, parse_mode="Markdown", reply_markup=keyboard)
-            sent_count += 1
-            await asyncio.sleep(0.1) 
-        except Exception as e:
-            logging.error(f"Не удалось отправить уведомление пользователю {user.get('telegram_id')}: {e}")
-    
-    logging.info(f"Отправлено уведомлений: {sent_count}")
-
 async def send_hourly_notification(bot: Bot):
     """Проверяет каждый час и отправляет уведомления нужным пользователям"""
     from datetime import datetime
@@ -235,73 +217,94 @@ async def send_hourly_notification(bot: Bot):
         logging.info(f"В {current_hour}:00 нет пользователей для уведомлений")
         return
     
-    notification_text = (
-        "🔔 Вы не отметили одежду, которую носили сегодня. Это можно сделать тут 👇"
-    )
-    
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(
-            text="📝 Отметить, что носили сегодня",
-            web_app=WebAppInfo(url=f"{MINI_APP_URL}?action=wear_today")
-        )
-    )
-    keyboard = builder.as_markup()
-
     sent_count = 0
     for user in users:
         try:
+            safe_name = html.escape(user.get('first_name') or 'друг')
+            
+            if user.get("has_planned_outfit"):
+                outfit_name = html.escape(user.get("planned_outfit_name") or "Загадочный образ")
+                text = (
+                    f"Привет, {safe_name}!\n\n"
+                    f"На завтра у тебя запланирован образ: <b>{outfit_name}</b>"
+                )
+                button_text = "Посмотреть образ"
+                webapp_url = f"{MINI_APP_URL}?action=view_planned"
+            else:
+                text = (
+                    f"🔔 Вы не запланировали образ на завтра!\n\n"
+                    f"Это можно сделать тут 👇"
+                )
+                button_text = "Собрать образ"
+                webapp_url = f"{MINI_APP_URL}?action=wear_today"
+
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                types.InlineKeyboardButton(
+                    text=button_text,
+                    web_app=WebAppInfo(url=webapp_url)
+                )
+            )
+            
             await bot.send_message(
                 user["telegram_id"],
-                notification_text,
-                reply_markup=keyboard
+                text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML"
             )
             sent_count += 1
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1) # Небольшая пауза, чтобы не спамить API Telegram
+            
         except Exception as e:
-            logging.error(f"Не удалось отправить уведомление: {e}")
-    
-    logging.info(f"В {current_hour}:00 отправлено уведомлений: {sent_count}")
-
-
-@dp.message(Command("test"))
-async def command_test_broadcast(message: types.Message):
-    """Тестовая команда для проверки рассылок"""
-    await message.answer("⏳ Запускаю тестовую рассылку...")
-    await send_daily_notification(message.bot, current_hour=19)
-    await message.answer("✅ Тестовая рассылка завершена! Проверьте логи.")
+            logging.error(f"Не удалось отправить уведомление пользователю {user['telegram_id']}: {e}")
+            
+    logging.info(f"Отправлено {sent_count} уведомлений в {current_hour}:00")
 
 @dp.callback_query(lambda c: c.data == "test_now")
 async def callback_test_now(callback: CallbackQuery):
     
     user_id = str(callback.from_user.id)
     
-    # Получаем текущий час
+    first_name_raw = callback.from_user.first_name
+    safe_name = html.escape(first_name_raw or 'друг')
+    
     moscow_tz = pytz.timezone('Europe/Moscow')
     current_hour = datetime.now(moscow_tz).hour
-    
-    # Устанавливаем время в базе
     await backend_client.update_settings(user_id, enabled=True, hour=current_hour)
     
-    # ТО ЖЕ уведомление что при обычной рассылке
-    notification_text = (
-        "🔔 Вы не отметили одежду, которую носили сегодня. Это можно сделать тут 👇"
-    )
+    users = await backend_client.get_users_to_notify(hour=current_hour)
+    current_user = next((u for u in users if u["telegram_id"] == user_id), None)
     
+    if current_user and current_user.get("has_planned_outfit"):
+        outfit_name = html.escape(current_user.get("planned_outfit_name") or "Загадочный образ")
+        text = (
+            f"Привет, {safe_name}!\n\n"
+            f"На завтра у тебя запланирован образ: <b>{outfit_name}</b>"
+        )
+        button_text = "👀 Посмотреть образ"
+        webapp_url = f"{MINI_APP_URL}?action=view_planned"
+    else:
+        text = (
+            f"🔔 Вы не запланировали образ на завтра!\n\n"
+            f"Это можно сделать тут 👇"
+        )
+        button_text = "Собрать образ"
+        webapp_url = f"{MINI_APP_URL}?action=wear_today"
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(
-            text="📝 Отметить, что носили сегодня",
-            web_app=WebAppInfo(url=f"{MINI_APP_URL}?action=wear_today")
+            text=button_text,
+            web_app=WebAppInfo(url=webapp_url)
         )
     )
-    keyboard = builder.as_markup()
-    
+
     try:
         await callback.bot.send_message(
             user_id,
-            notification_text,
-            reply_markup=keyboard
+            text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
         )
         
         await callback.message.edit_text(
@@ -318,18 +321,39 @@ async def callback_test_now(callback: CallbackQuery):
 @dp.message(Command("test_notify"))
 async def command_test_single(message: types.Message):
     user_id = str(message.from_user.id)
+    safe_name = html.escape(message.from_user.first_name or "друг")
     
-    notification_text = (
-        "🔔 Вы не отметили одежду, которую носили сегодня. Это можно сделать тут 👇"
-    )
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    current_hour = datetime.now(moscow_tz).hour
     
+    users = await backend_client.get_users_to_notify(hour=current_hour)
+    current_user = next((u for u in users if u["telegram_id"] == user_id), None)
+    
+    if current_user and current_user.get("has_planned_outfit"):
+        outfit_name = html.escape(current_user.get("planned_outfit_name") or "Загадочный образ")
+        text = (
+            f"Привет, {safe_name}!\n\n"
+            f"На завтра у тебя запланирован образ: <b>{outfit_name}</b>"
+        )
+        button_text = "Посмотреть образ"
+        webapp_url = f"{MINI_APP_URL}?action=view_planned"
+    else:
+        text = (
+            f"🔔 Вы не запланировали образ на завтра!\n\n"
+            f"Это можно сделать тут 👇"
+        )
+        button_text = "Собрать образ"
+        webapp_url = f"{MINI_APP_URL}?action=wear_today"
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(
-            text="📝 Отметить, что носили сегодня",
-            web_app=WebAppInfo(url=f"{MINI_APP_URL}?action=wear_today")
+            text=button_text,
+            web_app=WebAppInfo(url=webapp_url)
         )
     )
+    
+    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     
 
 @dp.message()
@@ -352,15 +376,15 @@ async def set_bot_commands(bot: Bot):
 
 
 async def main():
-    proxy_url = os.getenv("PROXY_HOST")
-    proxy_auth = BasicAuth(os.getenv("PROXY_USER"), os.getenv("PROXY_PASS"))
-    
-    bot_session = AiohttpSession(
-        proxy=(proxy_url, proxy_auth)
-    )
-    
-    bot = Bot(token=TOKEN, session=bot_session)
-
+    proxy_url = os.getenv("PROXY_HOST_SOCKS")
+    if proxy_url:
+        from aiogram.client.session.aiohttp import AiohttpSession
+        from aiohttp import BasicAuth
+        proxy_auth = BasicAuth(os.getenv("PROXY_USER"), os.getenv("PROXY_PASS"))
+        bot_session = AiohttpSession(proxy=(proxy_url, proxy_auth))
+        bot = Bot(token=TOKEN, session=bot_session)
+    else:
+        bot = Bot(token=TOKEN)
     scheduler.add_job(
         send_hourly_notification,
         trigger=CronTrigger(minute=0),
