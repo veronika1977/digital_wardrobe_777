@@ -489,7 +489,7 @@ const OutfitRenderer = ({
 };
 
 function App() {
-    const { initData, isTelegram, haptic } = useTelegram();
+    const { tg, initData, isTelegram, haptic } = useTelegram();
     const [isSavingWearToday, setIsSavingWearToday] = useState(false);
     const [outfitCreatedMessage, setOutfitCreatedMessage] = useState<string | null>(null);
     const hasHandledStartParam = useRef(false);
@@ -575,10 +575,78 @@ function App() {
     const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
     const [isPaymentLoading, setIsPaymentLoading] = useState(false);
     const [showLimitModal, setShowLimitModal] = useState<'items' | 'outfits' | 'capsules' | null>(null);
-
+    const [aiInputMessage, setAiInputMessage] = useState<string>('');
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+    const [promoCode, setPromoCode] = useState('');
+    const [isPromoLoading, setIsPromoLoading] = useState(false);
+    const [promoError, setPromoError] = useState<string | null>(null);
+    const [promoSuccess, setPromoSuccess] = useState(false);
+    const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
 
     const openDeleteModal = (id: number, type: 'clothes' | 'outfits' | 'capsules') => {
         setDeleteConfirm({ id, type });
+    };
+
+    const handleAiChatSubmit = async () => {
+        if (!aiInputMessage.trim() || isAiLoading) return;
+        
+        const userMsg = aiInputMessage.trim();
+        setAiInputMessage('');
+        setAiMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        setIsAiLoading(true);
+        haptic('light');
+
+        try {
+            console.log('[AI Chat] Отправка сообщения:', userMsg);
+            
+            const response = await fetch(`${API_BASE_URL}/ai-stylist/chat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: userMsg })
+            });
+
+            console.log('[AI Chat] Статус ответа:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Нет текста ошибки');
+                console.error('[AI Chat] Ошибка HTTP:', response.status, errorText);
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[AI Chat] Полный ответ от сервера:', JSON.stringify(data, null, 2));
+            
+            const aiText = data.reply || data.message || data.content || data.text || data.response || "Сообщение получено, но текст не распознан.";
+            
+            if (!aiText) {
+                console.warn('[AI Chat] Не найдено текстовое поле в ответе. Доступные поля:', Object.keys(data));
+            }
+            
+            const finalText = aiText || "Извините, не удалось получить ответ.";
+            
+            const aiOutfits = data.outfits || data.suggestions || data.data?.outfits || data.data?.suggestions || [];
+
+            setAiMessages(prev => [...prev, {
+                role: 'ai',
+                content: finalText,
+                outfits: aiOutfits.length > 0 ? aiOutfits : undefined
+            }]);
+            
+            haptic('medium');
+        } catch (error) {
+            console.error('[AI Chat] Полная ошибка:', error);
+            setAiMessages(prev => [...prev, {
+                role: 'ai',
+                content: 'Извините, произошла ошибка при обработке вашего сообщения. Проверьте подключение к интернету.'
+            }]);
+            haptic('heavy');
+        } finally {
+            setIsAiLoading(false);
+        }
     };
 
     const fetchCart = async () => {
@@ -1213,6 +1281,69 @@ function App() {
             }
         };
 
+        const handlePromoSubmit = async () => {
+    // Проверяем промокод (регистр не важен)
+    if (promoCode.trim().toLowerCase() !== 'лучшийпроектever') {
+        setPromoError('Неверный промокод');
+        haptic('heavy');
+        return;
+    }
+    
+    setIsPromoLoading(true);
+    setPromoError(null);
+    try {
+        // Достаем telegram_id из данных Telegram WebApp
+        let telegramId = tg?.initDataUnsafe?.user?.id?.toString();
+        if (!telegramId && initData) {
+            const params = new URLSearchParams(initData);
+            const userStr = params.get('user');
+            if (userStr) {
+                try {
+                    const user = JSON.parse(decodeURIComponent(userStr));
+                    telegramId = user.id?.toString();
+                } catch (e) {}
+            }
+        }
+        
+        if (!telegramId) {
+            throw new Error('Не удалось получить ID пользователя');
+        }
+        
+        // Отправляем запрос на бэкенд
+        const response = await fetch(`${API_BASE_URL}/subscription/set-tier/premium`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ telegram_id: telegramId })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Ошибка активации');
+        }
+        
+        // Если всё успешно
+        setPromoSuccess(true);
+        haptic('medium');
+        await fetchSubscriptionStatus(); // Обновляем статус подписки в UI
+        
+        setTimeout(() => {
+            setIsPromoModalOpen(false);
+            setPromoSuccess(false);
+            setPromoCode('');
+        }, 2500);
+        
+    } catch (error) {
+        console.error('Promo error:', error);
+        setPromoError(error instanceof Error ? error.message : 'Ошибка при активации');
+        haptic('heavy');
+    } finally {
+        setIsPromoLoading(false);
+    }
+};
+
     const deleteWearRecord = async (recordId: number) => {
         try {
         const response = await fetch(`${API_BASE_URL}/wear-records/${recordId}`, {
@@ -1323,6 +1454,12 @@ function App() {
         setDrawerError(null);
         setEditingItemId(null);
     };
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [aiMessages, isAiLoading]);
 
     useEffect(() => {
         if (isAuthLoading || !hasSeenWelcome || clothes.length === 0 || hasHandledStartParam.current) return;
@@ -1569,42 +1706,48 @@ function App() {
                 };
             }));
             setCapsules(mappedCapsules);
-
-            const allCapsuleOutfitsRaw = mappedCapsules.flatMap((c: any) => c.outfits || []);
-            const uniqueCapsuleMap = new Map();
-            allCapsuleOutfitsRaw.forEach((o: any) => uniqueCapsuleMap.set(o.id, o));
-            const allCapsuleOutfits = Array.from(uniqueCapsuleMap.values());
-            const capsuleOutfitMap = new Map(allCapsuleOutfits.map((o: any) => [o.id, o]));
-
-            const uniqueFreshMap = new Map();
-            freshOutfits.forEach((o: any) => uniqueFreshMap.set(o.id, o));
-            const uniqueFreshOutfits = Array.from(uniqueFreshMap.values());
-
-            const updatedOutfits = uniqueFreshOutfits.map((o: any) => {
-                if (capsuleOutfitMap.has(o.id)) {
-                const capsuleOutfit = capsuleOutfitMap.get(o.id);
-                return {
-                    ...o,
-                    capsule_name: capsuleOutfit.capsule_name,
-                    capsule_id: capsuleOutfit.capsule_id
-                };
-                }
-                return o;
-            });
-
-            const existingOutfitIds = new Set(updatedOutfits.map((o: any) => o.id));
-            const newCapsuleOutfits = allCapsuleOutfits.filter((o: any) => !existingOutfitIds.has(o.id));
-
-            const finalOutfitsMap = new Map();
-            [...updatedOutfits, ...newCapsuleOutfits].forEach((o: any) => finalOutfitsMap.set(o.id, o));
-            setOutfits(Array.from(finalOutfitsMap.values()));
+                const allCapsuleOutfitsRaw = mappedCapsules.flatMap((c: any) => c.outfits || []);
+                const uniqueCapsuleMap = new Map();
+                allCapsuleOutfitsRaw.forEach((o: any) => uniqueCapsuleMap.set(o.id, o));
+                const allCapsuleOutfits = Array.from(uniqueCapsuleMap.values());
+                const capsuleOutfitMap = new Map(allCapsuleOutfits.map((o: any) => [o.id, o]));
+                const uniqueFreshMap = new Map();
+                freshOutfits.forEach((o: any) => uniqueFreshMap.set(o.id, o));
+                const uniqueFreshOutfits = Array.from(uniqueFreshMap.values());
+                const updatedOutfits = uniqueFreshOutfits.map((o: any) => {
+                    if (capsuleOutfitMap.has(o.id)) {
+                        const capsuleOutfit = capsuleOutfitMap.get(o.id);
+                        return {
+                            ...o,
+                            capsule_name: capsuleOutfit.capsule_name,
+                            capsule_id: capsuleOutfit.capsule_id
+                        };
+                    }
+                    return o;
+                });
+                const existingOutfitIds = new Set(updatedOutfits.map((o: any) => o.id));
+                const newCapsuleOutfits = allCapsuleOutfits.filter((o: any) => !existingOutfitIds.has(o.id));
+                const finalOutfitsMap = new Map();
+                [...updatedOutfits, ...newCapsuleOutfits].forEach((o: any) => finalOutfitsMap.set(o.id, o));
+                setOutfits(Array.from(finalOutfitsMap.values()));
             }
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
         }
-        };
-        fetchAllData();
-        fetchWeather();
+
+        // === ЗАГРУЗКА ЗАПИСЕЙ О НОСКЕ (wear-records) ===
+        try {
+            const wearRes = await fetch(`${API_BASE_URL}/wear-records/`, { headers });
+            if (wearRes.ok) {
+                const wearData = await wearRes.json();
+                setWearRecords(wearData);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки записей носки:', error);
+        }
+    };
+    fetchAllData();
+    fetchWeather();
         fetchSubscriptionStatus();
     }, [token]);
 
@@ -2059,42 +2202,57 @@ function App() {
                         </button>
                         </div>
 
-                        <button
-                    onClick={handleUpgradeToPremium}
-                    disabled={isPaymentLoading}
-                    style={{
-                        width: '100%',
-                        padding: '14px',
-                        backgroundColor: '#151414',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '16px',
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        cursor: isPaymentLoading ? 'wait' : 'pointer',
-                        marginBottom: '16px',
-                        boxShadow: '0px 4px 12px rgba(21, 20, 20, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        fontFamily: 'Inter, sans-serif',
-                        opacity: isPaymentLoading ? 0.7 : 1,
-                        transition: 'all 0.2s ease'
-                    }}
-                    >
-                    {isPaymentLoading ? (
-                        <div style={{
-                            width: '16px',
-                            height: '16px',
-                            border: '2px solid rgba(255, 255, 255, 0.3)',
-                            borderTop: '2px solid #FFFFFF',
-                            borderRadius: '50%',
-                            animation: 'spin 0.8s linear infinite',
-                        }} />
-                    ) : '👑'}
-                    {isPaymentLoading ? 'Загрузка...' : 'Оформить Премиум'}
-                    </button>
+                        {subscription?.tier === 'premium' ? (
+    <div style={{
+        width: '100%', padding: '14px', backgroundColor: '#F9F8F6',
+        border: '1px solid rgba(21, 20, 20, 0.08)', borderRadius: '16px',
+        fontSize: '15px', fontWeight: '600', color: '#151414', marginBottom: '16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        fontFamily: 'Inter, sans-serif', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.03)'
+    }}>
+        <span style={{ fontSize: '18px' }}>👑</span>
+        У вас активна подписка Премиум
+    </div>
+) : (
+    <>
+        <button
+            onClick={() => setIsPremiumModalOpen(true)}
+            disabled={isPaymentLoading}
+            style={{
+                width: '100%',
+                padding: '14px',
+                backgroundColor: '#151414',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: isPaymentLoading ? 'wait' : 'pointer',
+                marginBottom: '16px',
+                boxShadow: '0px 4px 12px rgba(21, 20, 20, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontFamily: 'Inter, sans-serif',
+                opacity: isPaymentLoading ? 0.7 : 1,
+                transition: 'all 0.2s ease'
+            }}
+            >
+            {isPaymentLoading ? (
+                <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderTop: '2px solid #FFFFFF',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+                }} />
+            ) : ''}
+            {isPaymentLoading ? 'Загрузка...' : 'Оформить Премиум'}
+            </button>
+    </>
+)}
 
                     <ProfileGallery
                     clothes={clothes}
@@ -2674,12 +2832,13 @@ function App() {
                     haptic('heavy');
                     return;
                     }
-
-                    if (!editingOutfitId && subscription && subscription.outfits_count >= subscription.limits.max_outfits) {
-                        setShowLimitModal('outfits');
-                        return;
+                    const activeOutfitsCount = outfits.filter(o => !o.deletedAt).length;
+                    const maxOutfitsLimit = subscription?.limits?.max_outfits ?? 3;
+                    const isFreeUser = !subscription || subscription.tier === 'free';
+                    if (!editingOutfitId && isFreeUser && maxOutfitsLimit > 0 && activeOutfitsCount >= maxOutfitsLimit) {
+                    setShowLimitModal('outfits');
+                    return;
                     }
-
                     setIsSavingOutfit(true);
                     try {
                     const payload = {
@@ -3024,7 +3183,20 @@ function App() {
                     </button>
                 ))}
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '40px', scrollbarWidth: 'none' }}>
+                <div style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                paddingBottom: '40px',
+                scrollbarWidth: 'none'
+                }}>
+                <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '10px',
+                alignContent: 'start'
+                }}>
                 {(() => {
                     let itemsToShow = clothes.filter(item => !item.deletedAt);
                     if (editingOutfitCapsuleId) {
@@ -3079,9 +3251,10 @@ function App() {
                     );
                     });
                 })()}
-                </div>
-            </div>
-            </div>
+        </div>
+        </div>
+        </div>
+        </div>
         )}
 
         {isWearTodayPickerOpen && (
@@ -3109,7 +3282,8 @@ function App() {
         <p style={{ fontSize: '13px', color: '#6B6A69', margin: '0 0 16px 0', lineHeight: '1.4' }}>
         Отметьте вещи, которые были на вас сегодня. Это поможет вести точную статистику носки.
         </p>
-        <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', alignContent: 'start' }}>
         {clothes.filter((item: any) => !item.deletedAt).map((item: any) => {
         const isSelected = wearTodayItems.includes(item.id);
         return (
@@ -3193,6 +3367,7 @@ function App() {
         >
         {isSavingWearToday ? 'Сохраняем...' : `Сохранить (${wearTodayItems.length})`}
         </button>
+        </div>
         </div>
         </div>
         )}
@@ -3350,7 +3525,8 @@ function App() {
                     </div>
                     )}
 
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', paddingBottom: '40px', scrollbarWidth: 'none' }}>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '40px', scrollbarWidth: 'none' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', alignContent: 'start' }}>
                     {(clothes || [])
                         .filter((item: any) => !item.deletedAt && (capsulePickerCategory === 'all' || item.category === capsulePickerCategory))
                         .map((item: any) => {
@@ -3397,6 +3573,7 @@ function App() {
                     )}
                     </div>
                 </div>
+                </div>
                 </>
             )}
 
@@ -3416,11 +3593,13 @@ function App() {
                     <span style={{ fontSize: '16px', fontWeight: '600' }}>Образы капсулы</span>
                     <button
                     onClick={async () => {
-                        if (!editingCapsuleId && subscription && subscription.capsules_count >= subscription.limits.max_capsules) {
-                            setShowLimitModal('capsules');
-                            return;
+                        const activeCapsulesCount = capsules.filter(c => !c.deletedAt).length;
+                        const maxCapsulesLimit = subscription?.limits?.max_capsules ?? 1;
+                        const isFreeUser = !subscription || subscription.tier === 'free';
+                        if (!editingCapsuleId && isFreeUser && maxCapsulesLimit > 0 && activeCapsulesCount >= maxCapsulesLimit) {
+                        setShowLimitModal('capsules');
+                        return;
                         }
-
                         try {
                         setIsSavingCapsule(true);
                         const headers = {
@@ -3841,7 +4020,17 @@ function App() {
                     Готово
                 </button>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                <div style={{ 
+                    flex: 1, 
+                    minHeight: 0, 
+                    overflowY: 'auto', 
+                    WebkitOverflowScrolling: 'touch', 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gap: '10px', 
+                    alignContent: 'start',
+                    paddingBottom: '20px' 
+                }}>
                 {capsuleItems.map((item) => {
                     const isAlreadyOnCanvas = capsuleCanvasItems.some(i => i.id === item.id);
                     return (
@@ -3994,9 +4183,12 @@ function App() {
                     if (!newSeason) { setDrawerError('Выберите сезон вещи'); return; }
                     if (!newColor) { setDrawerError('Выберите цвет вещи'); return; }
                     if (!newMaterial) { setDrawerError('Выберите материал вещи'); return; }
-                    if (!editingItemId && subscription && subscription.items_count >= subscription.limits.max_items) {
-                        setShowLimitModal('items');
-                        return;
+                    const activeClothesCount = clothes.filter(c => !c.deletedAt).length;
+                    const maxItemsLimit = subscription?.limits?.max_items ?? 10;
+                    const isFreeUser = !subscription || subscription.tier === 'free';
+                    if (!editingItemId && isFreeUser && maxItemsLimit > 0 && activeClothesCount >= maxItemsLimit) {
+                    setShowLimitModal('items');
+                    return;
                     }
                     setDrawerError(null);
                     try {
@@ -4943,193 +5135,351 @@ function App() {
         )}
 
         {currentScreen === 'ai' && (
-            <div style={{
-            width: '100%',
-            height: '100vh',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: '16px 16px 100px 16px',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: '#edecea'
-            }}>
-            <div style={headerStyles.headerContainer}>
+    <div style={{
+        width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        padding: '16px 16px 100px 16px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
+        backgroundColor: '#edecea'
+    }}>
+        <div style={headerStyles.headerContainer}>
             <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/Icon.png" alt="VS Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                <img src="/Icon.png" alt="VS Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
             </div>
             <h1 style={headerStyles.headerTitle} className="fancy-serif">ИИ-СТИЛИСТ</h1>
-            </div>
+        </div>
 
-            {subscription?.tier === 'premium' ? (
+        {subscription?.tier === 'premium' ? (
             <>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingBottom: '20px' }}>
-            {aiMessages.length === 0 && (
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)' }}>
-            <p style={{ fontSize: '16px', fontWeight: '600', color: '#151414', margin: '0 0 8px 0' }}>Привет! Я ваш ИИ-стилист 👑</p>
-            <p style={{ fontSize: '14px', color: '#6B6A69', margin: 0, lineHeight: '1.5' }}>Я могу предложить готовые образы из вашего гардероба. Выберите капсулу или попросите меня создать образы из всей одежды.</p>
-            </div>
-            )}
-            {aiMessages.map((msg, idx) => (
-            <div key={idx} style={{ backgroundColor: msg.role === 'user' ? '#151414' : '#FFFFFF', color: msg.role === 'user' ? '#FFFFFF' : '#151414', borderRadius: '16px', padding: '16px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)' }}>
-            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>{msg.content}</p>
-            {msg.outfits && msg.outfits.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box', marginTop: '12px' }}>
-            {msg.outfits.map((outfit, outfitIdx) => {
-            const isSaved = savedAiOutfitIds.has(outfitIdx);
-            const isSaving = isSavingAiOutfit === outfitIdx;
-            return (
-            <div key={outfitIdx} onClick={() => { setSelectedOutfitForView(outfit); haptic('light'); }} style={{ ...galleryStyles.card, cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}>
-            <OutfitRenderer items={outfit.items || []} containerWidth={85} />
-            <span style={{ fontSize: '11px', fontWeight: '500', color: '#151414', paddingLeft: '2px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{outfit.name}</span>
-            <button onClick={async (e) => {
-            e.stopPropagation();
-            if (isSaved || isSaving) return;
-            setIsSavingAiOutfit(outfitIdx);
-            haptic('light');
-            try {
-            const payload = { name: outfit.name, items: (outfit.items || []).map((item: any) => ({ clothing_item_id: item.id, x: item.x || 0, y: item.y || 0, scale: item.scale || 1 })) };
-            if (selectedCapsuleForAi) { (payload as any).capsule_id = selectedCapsuleForAi; }
-            const response = await fetch(`${API_BASE_URL}/outfits/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error('Ошибка сохранения');
-            const savedOutfit = await response.json();
-            const newOutfit = { ...savedOutfit, id: savedOutfit.id, name: outfit.name, items: outfit.items.map((item: any) => ({ ...item, x: item.x || 100, y: item.y || 50, scale: item.scale || 1, outfit_item_id: item.id })), capsule_id: selectedCapsuleForAi, capsule_name: selectedCapsuleForAi ? capsules.find(c => c.id === selectedCapsuleForAi)?.name : null, deletedAt: null };
-            setOutfits(prev => [newOutfit, ...prev]);
-            setSavedAiOutfitIds(prev => new Set([...prev, outfitIdx]));
-            haptic('medium');
-            } catch (error) { console.error('Ошибка сохранения образа:', error); alert('Не удалось сохранить образ'); } finally { setIsSavingAiOutfit(null); }
-            }} style={{ position: 'absolute', top: '10px', right: '10px', width: '18px', height: '18px', borderRadius: '50%', border: 'none', backgroundColor: isSaved ? '#4CAF50' : isSaving ? '#8B8A89' : 'rgba(21, 20, 20, 0.75)', color: '#FFFFFF', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isSaved || isSaving ? 'default' : 'pointer', opacity: isSaved || isSaving ? 0.7 : 1, transition: 'all 0.2s ease', zIndex: 10 }} disabled={isSaved || isSaving}>
-            {isSaved ? '✓' : isSaving ? '' : '+'}
-            </button>
-            </div>
-            );
-            })}
-            </div>
-            )}
-            </div>
-            ))}
-            {isAiLoading && (
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '16px', alignSelf: 'flex-start', maxWidth: '85%', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={drawerStyles.spinner} />
-            <span style={{ fontSize: '14px', color: '#6B6A69' }}>Генерирую образы...</span>
-            </div>
-            )}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
-            {capsules.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-            <button onClick={() => setSelectedCapsuleForAi(null)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', backgroundColor: selectedCapsuleForAi === null ? '#151414' : '#FFFFFF', color: selectedCapsuleForAi === null ? '#FFFFFF' : '#151414', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0 }}>Все вещи</button>
-            {capsules.filter(c => !c.deletedAt).map(capsule => (
-            <button key={capsule.id} onClick={() => setSelectedCapsuleForAi(capsule.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', backgroundColor: selectedCapsuleForAi === capsule.id ? '#151414' : '#FFFFFF', color: selectedCapsuleForAi === capsule.id ? '#FFFFFF' : '#151414', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0 }}>{capsule.name}</button>
-            ))}
-            </div>
-            )}
-            <button onClick={async () => {
-            if (isAiLoading) return;
-            let itemsToCheck = clothes.filter(item => !item.deletedAt);
-            if (selectedCapsuleForAi) {
-            const capsule = capsules.find(c => c.id === selectedCapsuleForAi);
-            if (capsule) {
-            const capsuleItemIds = capsule.items.map((i: any) => i.id);
-            itemsToCheck = itemsToCheck.filter(item => capsuleItemIds.includes(item.id));
-            }
-            }
-            if (itemsToCheck.length < 3) {
-            setAiMessages(prev => [...prev, { role: 'ai', content: `Для генерации образов нужно минимум 3 вещи. Сейчас у вас ${itemsToCheck.length} ${itemsToCheck.length === 1 ? 'вещь' : itemsToCheck.length < 5 ? 'вещи' : 'вещей'}. Добавьте ещё одежды в гардероб${selectedCapsuleForAi ? ' или выберите другую капсулу' : ''}.` }]);
-            haptic('heavy');
-            return;
-            }
-            setIsAiLoading(true);
-            const userMessage = selectedCapsuleForAi ? `Предложи образы из капсулы "${capsules.find(c => c.id === selectedCapsuleForAi)?.name}"` : 'Предложи образы из всего моего гардероба';
-            setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-            try {
-            const payload = selectedCapsuleForAi ? { capsule_id: selectedCapsuleForAi } : {};
-            const response = await fetch(`${API_BASE_URL}/outfits/generate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || errorData.message || `Ошибка ${response.status}`);
-            }
-            const data = await response.json();
-            const rawOutfits = data.suggestions || data.outfits || data.data?.suggestions || data.data?.outfits || [];
-            if (!Array.isArray(rawOutfits)) throw new Error('Неверный формат ответа от сервера');
-            const outfits = rawOutfits.map((outfit: any) => {
-            const items = (outfit.items || []).map((item: any, itemIdx: number) => {
-            const cloth = clothes.find(c => c.id === item.clothing_item_id);
-            return { id: item.clothing_item_id, img: getFullImageUrl(item.image_url || cloth?.img || '/placeholder.png'), x: 102, y: 80 + (itemIdx * 120), scale: 1 };
-            });
-            return { ...outfit, items };
-            });
-            if (outfits.length === 0) {
-            setAiMessages(prev => [...prev, { role: 'ai', content: 'К сожалению, не удалось сгенерировать образы. Убедитесь, что в гардеробе есть достаточно вещей.' }]);
-            } else {
-            setAiMessages(prev => [...prev, { role: 'ai', content: `Вот ${outfits.length} ${outfits.length === 1 ? 'образ' : outfits.length < 5 ? 'образа' : 'образов'} для вас:`, outfits: outfits }]);
-            }
-            haptic('medium');
-            } catch (error) {
-            console.error('[AI] Полная ошибка:', error);
-            const errorMsg = error instanceof Error ? error.message : 'Неизвестная ошибка';
-            let friendlyMessage = 'Извините, произошла ошибка при генерации образов.';
-            if (errorMsg.includes('3 clothing items')) friendlyMessage = `Для генерации нужно минимум 3 вещи. У вас сейчас ${itemsToCheck.length}. Добавьте ещё одежды!`;
-            else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) friendlyMessage = 'Сессия истекла. Пожалуйста, войдите заново.';
-            else if (errorMsg.includes('Network') || errorMsg.includes('fetch')) friendlyMessage = 'Проблема с соединением. Проверьте интернет.';
-            else friendlyMessage = `Ошибка: ${errorMsg}`;
-            setAiMessages(prev => [...prev, { role: 'ai', content: friendlyMessage }]);
-            haptic('heavy');
-            } finally {
-            setIsAiLoading(false);
-            }
-            }} style={{ width: '100%', padding: '16px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '16px', fontSize: '15px', fontWeight: '600', cursor: isAiLoading ? 'wait' : 'pointer', opacity: isAiLoading ? 0.6 : 1, boxShadow: '0px 6px 16px rgba(21, 20, 20, 0.15)' }}>
-            {isAiLoading ? 'Генерирую...' : 'Сгенерировать образы'}
-            </button>
-            </div>
+                {/* 1. Область сообщений (Чат) */}
+                <div ref={chatContainerRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingBottom: '20px', WebkitOverflowScrolling: 'touch' }}>
+                    {aiMessages.length === 0 && (
+                        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '24px', textAlign: 'center', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.03)' }}>
+                            <p style={{ fontSize: '16px', fontWeight: '600', color: '#151414', margin: '0 0 8px 0' }}>Привет! Я ваш ИИ-стилист 👑</p>
+                            <p style={{ fontSize: '14px', color: '#6B6A69', margin: 0, lineHeight: '1.5' }}>Спросите меня о стиле, попросите подобрать образ или сгенерировать луки из вашего гардероба.</p>
+                        </div>
+                    )}
+                    {aiMessages.map((msg, idx) => (
+                        <div key={idx} style={{ backgroundColor: msg.role === 'user' ? '#151414' : '#FFFFFF', color: msg.role === 'user' ? '#FFFFFF' : '#151414', borderRadius: '16px', padding: '16px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)' }}>
+                            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                            {msg.outfits && msg.outfits.length > 0 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box', marginTop: '12px' }}>
+                                    {msg.outfits.map((outfit, outfitIdx) => {
+                                        const isSaved = savedAiOutfitIds.has(outfitIdx);
+                                        const isSaving = isSavingAiOutfit === outfitIdx;
+                                        return (
+                                            <div key={outfitIdx} onClick={() => { setSelectedOutfitForView(outfit); haptic('light'); }} style={{ ...galleryStyles.card, cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}>
+                                                <OutfitRenderer items={outfit.items || []} containerWidth={85} />
+                                                <span style={{ fontSize: '11px', fontWeight: '500', color: '#151414', paddingLeft: '2px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{outfit.name}</span>
+                                                <button onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (isSaved || isSaving) return;
+                                                    setIsSavingAiOutfit(outfitIdx);
+                                                    haptic('light');
+                                                    try {
+                                                        const payload = { name: outfit.name, items: (outfit.items || []).map((item: any) => ({ clothing_item_id: item.id, x: item.x || 0, y: item.y || 0, scale: item.scale || 1 })) };
+                                                        if (selectedCapsuleForAi) { (payload as any).capsule_id = selectedCapsuleForAi; }
+                                                        const response = await fetch(`${API_BASE_URL}/outfits/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                                        if (!response.ok) throw new Error('Ошибка сохранения');
+                                                        const savedOutfit = await response.json();
+                                                        const newOutfit = { ...savedOutfit, id: savedOutfit.id, name: outfit.name, items: outfit.items.map((item: any) => ({ ...item, x: item.x || 100, y: item.y || 50, scale: item.scale || 1, outfit_item_id: item.id })), capsule_id: selectedCapsuleForAi, capsule_name: selectedCapsuleForAi ? capsules.find(c => c.id === selectedCapsuleForAi)?.name : null, deletedAt: null };
+                                                        setOutfits(prev => [newOutfit, ...prev]);
+                                                        setSavedAiOutfitIds(prev => new Set([...prev, outfitIdx]));
+                                                        haptic('medium');
+                                                    } catch (error) { console.error('Ошибка сохранения образа:', error); alert('Не удалось сохранить образ'); } finally { setIsSavingAiOutfit(null); }
+                                                }} style={{ position: 'absolute', top: '10px', right: '10px', width: '18px', height: '18px', borderRadius: '50%', border: 'none', backgroundColor: isSaved ? '#4CAF50' : isSaving ? '#8B8A89' : 'rgba(21, 20, 20, 0.75)', color: '#FFFFFF', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isSaved || isSaving ? 'default' : 'pointer', opacity: isSaved || isSaving ? 0.7 : 1, transition: 'all 0.2s ease', zIndex: 10 }} disabled={isSaved || isSaving}>
+                                                    {isSaved ? '✓' : isSaving ? '' : '+'}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {isAiLoading && (
+                        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '16px', alignSelf: 'flex-start', maxWidth: '85%', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={drawerStyles.spinner} />
+                            <span style={{ fontSize: '14px', color: '#6B6A69' }}>Думаю...</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. Нижние кнопки и ввод */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
+                    {/* Выбор капсулы */}
+                    {capsules.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                            <button onClick={() => setSelectedCapsuleForAi(null)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', backgroundColor: selectedCapsuleForAi === null ? '#151414' : '#FFFFFF', color: selectedCapsuleForAi === null ? '#FFFFFF' : '#151414', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0 }}>Все вещи</button>
+                            {capsules.filter(c => !c.deletedAt).map(capsule => (
+                                <button key={capsule.id} onClick={() => setSelectedCapsuleForAi(capsule.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', backgroundColor: selectedCapsuleForAi === capsule.id ? '#151414' : '#FFFFFF', color: selectedCapsuleForAi === capsule.id ? '#FFFFFF' : '#151414', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', flexShrink: 0 }}>{capsule.name}</button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* НОВОЕ: Поле ввода для чата */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            placeholder="Спросите у ИИ..."
+                            value={aiInputMessage}
+                            onChange={(e) => setAiInputMessage(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAiChatSubmit(); } }}
+                            style={{
+                                flex: 1, padding: '14px 16px', borderRadius: '16px', border: 'none',
+                                backgroundColor: '#FFFFFF', color: '#151414', fontSize: '15px', outline: 'none',
+                                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)', fontFamily: 'Inter, sans-serif'
+                            }}
+                        />
+                        <button
+                            onClick={handleAiChatSubmit}
+                            disabled={isAiLoading || !aiInputMessage.trim()}
+                            style={{
+                                width: '48px', height: '48px', borderRadius: '50%', border: 'none',
+                                backgroundColor: '#151414', color: '#FFFFFF', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                cursor: isAiLoading || !aiInputMessage.trim() ? 'not-allowed' : 'pointer',
+                                opacity: isAiLoading || !aiInputMessage.trim() ? 0.5 : 1, flexShrink: 0,
+                                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)'
+                            }}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* СТАРАЯ: Кнопка генерации образов (оставляем для совместимости) */}
+                    <button onClick={async () => {
+                        if (isAiLoading) return;
+                        let itemsToCheck = clothes.filter(item => !item.deletedAt);
+                        if (selectedCapsuleForAi) {
+                            const capsule = capsules.find(c => c.id === selectedCapsuleForAi);
+                            if (capsule) {
+                                const capsuleItemIds = capsule.items.map((i: any) => i.id);
+                                itemsToCheck = itemsToCheck.filter(item => capsuleItemIds.includes(item.id));
+                            }
+                        }
+                        if (itemsToCheck.length < 3) {
+                            setAiMessages(prev => [...prev, { role: 'ai', content: `Для генерации образов нужно минимум 3 вещи. Сейчас у вас ${itemsToCheck.length} ${itemsToCheck.length === 1 ? 'вещь' : itemsToCheck.length < 5 ? 'вещи' : 'вещей'}. Добавьте ещё одежды в гардероб${selectedCapsuleForAi ? ' или выберите другую капсулу' : ''}.` }]);
+                            haptic('heavy');
+                            return;
+                        }
+                        setIsAiLoading(true);
+                        const userMessage = selectedCapsuleForAi ? `Предложи образы из капсулы "${capsules.find(c => c.id === selectedCapsuleForAi)?.name}"` : 'Предложи образы из всего моего гардероба';
+                        setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+                        try {
+                            const payload = selectedCapsuleForAi ? { capsule_id: selectedCapsuleForAi } : {};
+                            const response = await fetch(`${API_BASE_URL}/outfits/generate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                            if (!response.ok) {
+                                const errorData = await response.json().catch(() => ({}));
+                                throw new Error(errorData.detail || errorData.message || `Ошибка ${response.status}`);
+                            }
+                            const data = await response.json();
+                            const rawOutfits = data.suggestions || data.outfits || data.data?.suggestions || data.data?.outfits || [];
+                            if (!Array.isArray(rawOutfits)) throw new Error('Неверный формат ответа от сервера');
+                            const outfits = rawOutfits.map((outfit: any) => {
+                                const items = (outfit.items || []).map((item: any, itemIdx: number) => {
+                                    const cloth = clothes.find(c => c.id === item.clothing_item_id);
+                                    return { id: item.clothing_item_id, img: getFullImageUrl(item.image_url || cloth?.img || '/placeholder.png'), x: 102, y: 80 + (itemIdx * 120), scale: 1 };
+                                });
+                                return { ...outfit, items };
+                            });
+                            if (outfits.length === 0) {
+                                setAiMessages(prev => [...prev, { role: 'ai', content: 'К сожалению, не удалось сгенерировать образы. Убедитесь, что в гардеробе есть достаточно вещей.' }]);
+                            } else {
+                                setAiMessages(prev => [...prev, { role: 'ai', content: `Вот ${outfits.length} ${outfits.length === 1 ? 'образ' : outfits.length < 5 ? 'образа' : 'образов'} для вас:`, outfits: outfits }]);
+                            }
+                            haptic('medium');
+                        } catch (error) {
+                            console.error('[AI] Полная ошибка:', error);
+                            const errorMsg = error instanceof Error ? error.message : 'Неизвестная ошибка';
+                            let friendlyMessage = 'Извините, произошла ошибка при генерации образов.';
+                            if (errorMsg.includes('3 clothing items')) friendlyMessage = `Для генерации нужно минимум 3 вещи. У вас сейчас ${itemsToCheck.length}. Добавьте ещё одежды!`;
+                            else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) friendlyMessage = 'Сессия истекла. Пожалуйста, войдите заново.';
+                            else if (errorMsg.includes('Network') || errorMsg.includes('fetch')) friendlyMessage = 'Проблема с соединением. Проверьте интернет.';
+                            else friendlyMessage = `Ошибка: ${errorMsg}`;
+                            setAiMessages(prev => [...prev, { role: 'ai', content: friendlyMessage }]);
+                            haptic('heavy');
+                        } finally {
+                            setIsAiLoading(false);
+                        }
+                    }} style={{ width: '100%', padding: '16px', backgroundColor: '#151414', color: '#FFFFFF', border: 'none', borderRadius: '16px', fontSize: '15px', fontWeight: '600', cursor: isAiLoading ? 'wait' : 'pointer', opacity: isAiLoading ? 0.6 : 1, boxShadow: '0px 6px 16px rgba(21, 20, 20, 0.15)' }}>
+                        {isAiLoading ? 'Генерирую...' : 'Сгенерировать образы'}
+                    </button>
+                </div>
             </>
-            ) : (
+        ) : (
+            /* Экран для бесплатных пользователей */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '24px', gap: '24px' }}>
-            <div style={{ 
-            width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#F2F1EF', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px' 
-            }}>
-            🔒
+                <div style={{ 
+                    width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#F2F1EF', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px' 
+                }}>
+                    🔒
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#151414', margin: '0 0 12px 0' }}>ИИ-Стилист доступен только в Премиум</h2>
+                    <p style={{ fontSize: '15px', color: '#6B6A69', lineHeight: '1.5', margin: 0 }}>
+                        Получите неограниченный доступ к умному подбору образов, анализу гардероба и персональным рекомендациям на основе вашей одежды.
+                    </p>
+                </div>
+                <button
+                    onClick={() => setIsPremiumModalOpen(true)}
+                    disabled={isPaymentLoading}
+                    style={{
+                        width: '100%', maxWidth: '280px', padding: '16px', backgroundColor: '#151414', color: '#FFFFFF',
+                        border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600',
+                        cursor: isPaymentLoading ? 'wait' : 'pointer', boxShadow: '0px 8px 24px rgba(21, 20, 20, 0.15)',
+                        opacity: isPaymentLoading ? 0.7 : 1, transition: 'all 0.2s ease'
+                    }}
+                >
+                    {isPaymentLoading ? 'Загрузка...' : 'Оформить Премиум'}
+                </button>
             </div>
-            <div>
-            <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#151414', margin: '0 0 12px 0' }}>ИИ-Стилист доступен только в Премиум</h2>
-            <p style={{ fontSize: '15px', color: '#6B6A69', lineHeight: '1.5', margin: 0 }}>
-            Получите неограниченный доступ к умному подбору образов, анализу гардероба и персональным рекомендациям на основе вашей одежды.
-            </p>
+        )}
+    </div>
+)}
+        
+        {isPremiumModalOpen && (
+    <>
+        <div
+            onClick={() => setIsPremiumModalOpen(false)}
+            style={{ ...galleryStyles.confirmBackdrop, zIndex: 100007 }}
+        />
+        <div style={{ ...galleryStyles.confirmBox, zIndex: 100008 }}>
+            <div style={{ fontSize: '40px', marginBottom: '16px' }}>👑</div>
+            <span style={{ ...galleryStyles.confirmText, fontWeight: '700', marginBottom: '24px' }}>
+                Выберите способ активации
+            </span>
+            <div style={{ ...galleryStyles.confirmActions, flexDirection: 'column', gap: '12px', width: '100%' }}>
+                <button
+                    onClick={() => {
+                        setIsPremiumModalOpen(false);
+                        setIsPromoModalOpen(true);
+                    }}
+                    style={{
+                        width: '100%',
+                        padding: '14px',
+                        backgroundColor: '#FFFFFF',
+                        color: '#151414',
+                        border: '2px solid #151414',
+                        borderRadius: '14px',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontFamily: 'Inter, sans-serif'
+                    }}
+                >
+                    🎁 У меня есть промокод
+                </button>
+                <button
+                    onClick={() => {
+                        setIsPremiumModalOpen(false);
+                        handleUpgradeToPremium();
+                    }}
+                    disabled={isPaymentLoading}
+                    style={{
+                        width: '100%',
+                        padding: '14px',
+                        backgroundColor: '#151414',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '14px',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: isPaymentLoading ? 'wait' : 'pointer',
+                        opacity: isPaymentLoading ? 0.7 : 1,
+                        fontFamily: 'Inter, sans-serif'
+                    }}
+                >
+                    💳 Оплатить картой
+                </button>
+                <button
+                    onClick={() => setIsPremiumModalOpen(false)}
+                    style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: 'transparent',
+                        color: '#8B8A89',
+                        border: 'none',
+                        borderRadius: '14px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        fontFamily: 'Inter, sans-serif'
+                    }}
+                >
+                    Отмена
+                </button>
             </div>
-            <button
-            onClick={handleUpgradeToPremium}
-            disabled={isPaymentLoading}
-            style={{
-            width: '100%',
-            maxWidth: '280px',
-            padding: '16px',
-            backgroundColor: '#151414',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '16px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: isPaymentLoading ? 'wait' : 'pointer',
-            boxShadow: '0px 8px 24px rgba(21, 20, 20, 0.15)',
-            opacity: isPaymentLoading ? 0.7 : 1,
-            transition: 'all 0.2s ease'
-            }}
-            >
-            {isPaymentLoading ? 'Загрузка...' : 'Оформить Премиум'}
-            </button>
-            </div>
+        </div>
+    </>
+)}
+
+{isPromoModalOpen && (
+    <>
+        <div onClick={() => { if(!isPromoLoading) setIsPromoModalOpen(false); }} style={{ ...galleryStyles.confirmBackdrop, zIndex: 100005 }} />
+        <div style={{ ...galleryStyles.confirmBox, zIndex: 100006 }}>
+            {promoSuccess ? (
+                <>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
+                    <span style={{ ...galleryStyles.confirmText, fontWeight: '700', color: '#4CAF50' }}>Премокод активирован!</span>
+                    <span style={{ fontSize: '14px', color: '#6B6A69', lineHeight: '1.4', textAlign: 'center' }}>Теперь у вас есть доступ ко всем функциям Премиум.</span>
+                </>
+            ) : (
+                <>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎁</div>
+                    <span style={{ ...galleryStyles.confirmText, fontWeight: '700' }}>Введите промокод</span>
+                    <input
+                        type="text"
+                        placeholder="Ваш промокод"
+                        value={promoCode}
+                        onChange={(e) => { setPromoCode(e.target.value); setPromoError(null); }}
+                        style={{
+                            width: '100%', padding: '14px 16px', borderRadius: '14px',
+                            border: '1px solid #E6E5E3', backgroundColor: '#F9F8F6',
+                            fontSize: '15px', boxSizing: 'border-box', outline: 'none',
+                            textAlign: 'center', fontFamily: 'Inter, sans-serif'
+                        }}
+                    />
+                    {promoError && (
+                        <span style={{ fontSize: '13px', color: '#E57373', fontWeight: '500' }}>{promoError}</span>
+                    )}
+                    <div style={{ ...galleryStyles.confirmActions, flexDirection: 'column', gap: '10px', width: '100%' }}>
+                        <button
+                            onClick={handlePromoSubmit}
+                            disabled={isPromoLoading || !promoCode.trim()}
+                            style={{
+                                width: '100%', padding: '14px', backgroundColor: '#151414', color: '#FFFFFF',
+                                border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600',
+                                cursor: isPromoLoading || !promoCode.trim() ? 'not-allowed' : 'pointer',
+                                opacity: isPromoLoading || !promoCode.trim() ? 0.6 : 1
+                            }}
+                        >
+                            {isPromoLoading ? 'Активация...' : 'Активировать'}
+                        </button>
+                        <button
+                            onClick={() => setIsPromoModalOpen(false)}
+                            disabled={isPromoLoading}
+                            style={{
+                                width: '100%', padding: '14px', backgroundColor: 'transparent', color: '#8B8A89',
+                                border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600',
+                                cursor: isPromoLoading ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            Отмена
+                        </button>
+                    </div>
+                </>
             )}
-            </div>
-            )}
+        </div>
+    </>
+)}
 
         {showLimitModal && (
             <>
-            <div onClick={() => setShowLimitModal(null)} style={galleryStyles.confirmBackdrop} />
-            <div style={galleryStyles.confirmBox}>
+            <div onClick={() => setShowLimitModal(null)} style={{ ...galleryStyles.confirmBackdrop, zIndex: 100005 }} />
+            <div style={{ ...galleryStyles.confirmBox, zIndex: 100006 }}>
                 <div style={{ fontSize: '40px', marginBottom: '8px' }}>👑</div>
                 <span style={{ ...galleryStyles.confirmText, fontWeight: '700' }}>
                     {showLimitModal === 'items' && 'Достигнут лимит вещей (10/10)'}
@@ -5142,8 +5492,8 @@ function App() {
                 <div style={{ ...galleryStyles.confirmActions, flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                     <button
                         onClick={() => {
-                            setShowLimitModal(null);
-                            handleUpgradeToPremium();
+                        setShowLimitModal(null);
+                        setIsPremiumModalOpen(true);
                         }}
                         disabled={isPaymentLoading}
                         style={{ 
